@@ -1,0 +1,71 @@
+{
+  "name": "@dpayglobal/dpay-node-sdk",
+  "version": "0.1.0",
+  "description": "Official dpay.pl Node.js SDK",
+  "license": "Apache-2.0",
+  "author": "dpay <kontakt@dpay.pl>",
+  "homepage": "https://dpay.pl",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dpayglobal/dpay-node-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dpayglobal/dpay-node-sdk/issues"
+  },
+  "keywords": ["dpay", "payments", "blik", "cards", "sdk", "platnosci"],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+  "dependencies": {},
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.0",
+    "@biomejs/biome": "^1.9.0",
+    "@types/node": "^22.0.0",
+    "publint": "^0.3.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "package:check": "npm run build && publint && attw --pack . --profile node16",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

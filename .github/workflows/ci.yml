@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22', '24', '26']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      - run: npx publint
+      - run: npx @arethetypeswrong/cli --pack . --profile node16
+
+  php-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Golden vectors from the PHP SDK
+        run: npx vitest run tests/golden
+
+  no-runtime-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: The packed tarball must work with no dependencies installed
+        run: |
+          npm pack --pack-destination /tmp
+          mkdir /tmp/consumer && cd /tmp/consumer
+          npm init -y > /dev/null
+          npm install /tmp/dpayglobal-dpay-node-sdk-*.tgz
+          test "$(node -p "Object.keys(require('$PWD/node_modules/@dpayglobal/dpay-node-sdk/package.json').dependencies || {}).length")" = "0"
+          node --input-type=module -e "
+            import { DPayClient } from '@dpayglobal/dpay-node-sdk'
+            import { MockHttpClient } from '@dpayglobal/dpay-node-sdk/testing'
+            const transport = new MockHttpClient()
+            transport.queueJson(200, { transaction: { id: 'tx-1', status: 'paid' } })
+            const dpay = new DPayClient({ service: 's', secretHash: 'h', httpClient: transport })
+            if (!(await dpay.payments.details('tx-1')).isPaid) process.exit(1)
+            console.log('OK: ESM, zero runtime dependencies')
+          "
+          node -e "
+            const { DPayClient } = require('@dpayglobal/dpay-node-sdk')
+            const { MockHttpClient } = require('@dpayglobal/dpay-node-sdk/testing')
+            const transport = new MockHttpClient()
+            transport.queueJson(200, { transaction: { id: 'tx-1', status: 'paid' } })
+            const dpay = new DPayClient({ service: 's', secretHash: 'h', httpClient: transport })
+            dpay.payments.details('tx-1').then((tx) => {
+              if (!tx.isPaid) process.exit(1)
+              console.log('OK: CJS')
+            })
+          "

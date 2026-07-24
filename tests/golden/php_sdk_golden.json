@@ -1,0 +1,336 @@
+{
+    "calls": [
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/register",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"value\":\"29.99\",\"transactionType\":\"transfers\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"description\":\"Zamówienie #1234 / ĄĘŚŻ\",\"custom\":\"order-1234\",\"email\":\"jan@example.com\",\"client_name\":\"Jan\",\"client_surname\":\"Kowalski\",\"accept_tos\":true,\"channel\":\"86\",\"creditcard\":1,\"paysafecard\":0,\"blik\":1,\"installment\":0,\"paypal\":1,\"nobanks\":0,\"phone_number\":\"+48123456789\",\"currency_code\":\"EUR\",\"partner_platform\":\"SHOPIFY01\",\"alias_ipn_url\":\"https://shop.test/alias-ipn\",\"no_delay\":true,\"authorize_only\":false,\"card_recurring_operation\":\"charge\",\"payout\":{\"fee_mode\":\"gross\",\"positions\":[{\"iban\":\"PL61109010140000071219812874\",\"title\":\"Wypłata 1\",\"amount\":10.5}]},\"billing_address\":{\"street\":\"Testowa 1\",\"city\":\"Warszawa\"},\"shipping_address\":{\"street\":\"Inna 2\"},\"device_info\":{\"browserAcceptHeader\":\"text/html\",\"browserLanguage\":\"pl-PL\",\"browserColorDepth\":24,\"browserScreenHeight\":1080,\"browserScreenWidth\":1920,\"browserTZ\":-60,\"browserUserAgent\":\"Mozilla/5.0\",\"systemFamily\":\"Windows\",\"geoLocalization\":\"52.2297,21.0122\",\"deviceID\":\"device-abc\",\"applicationName\":\"Sklep Testowy\",\"browserJavaEnabled\":\"true\"},\"products\":[{\"name\":\"Produkt\",\"price\":29.99}],\"efaktura\":true,\"invoice\":{\"payer_nip\":\"1234563218\",\"payer_name\":\"Firma sp. z o.o.\",\"invoice_number\":\"FV/2026/07/1\",\"payment_due_date\":\"2026-08-15\",\"vat_amount\":560},\"checksum\":\"056198b45db5fcec2140233fbc8b3b0929fdad82c0a678933c91b8d561ac7058\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/register",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"value\":\"10.00\",\"transactionType\":\"blik_recurring\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"user_agent\":\"UA/1.0\",\"user_ip\":\"10.0.0.1\",\"blik_code\":\"123456\",\"register_blik_recurring_alias\":{\"label\":\"Subskrypcja\",\"type\":\"PAYID\",\"model\":\"M\",\"frequency\":\"12M\",\"value\":\"49.99\",\"limit_amt\":100000,\"tot_limit_amt\":500000,\"is_limit_amt_fixed\":true,\"expiration_date\":\"2027-01-01\",\"init_date\":\"2026-08-01\"},\"checksum\":\"26d9b0eb1a44b63f8875fad87aad0956189e620a9e4c1443f3f347bc4e6bb52d\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/register",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"value\":\"5.00\",\"transactionType\":\"card_recurring\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"register_blik_alias\":{\"label\":\"Moj alias\",\"type\":\"PAYID\"},\"register_card_recurring\":{\"label\":\"Mandat\",\"frequency\":\"MONTHLY\",\"limit_amt\":20000,\"tot_limit_amt\":100000,\"is_limit_amt_fixed\":false,\"expiration_date\":\"2028-12-31\",\"init_date\":\"2026-09-01\"},\"checksum\":\"bb6346930c49321bad9714039e350519df459075a20c94bd1ef8f79ba26bfd0c\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://panel.dpay.pl/api/v1/pbl/details",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"transaction_id\":\"tx-1\",\"checksum\":\"9508d77a17bdd44829ecc450214a3e356ca0cbe2f93c28012e3a5f6b39b4aa30\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://panel.dpay.pl/api/v1/pbl/refund",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"transaction_id\":\"tx-1\",\"checksum\":\"9508d77a17bdd44829ecc450214a3e356ca0cbe2f93c28012e3a5f6b39b4aa30\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://panel.dpay.pl/api/v1/pbl/refund",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"transaction_id\":\"tx-1\",\"value\":\"10.50\",\"reason\":\"reklamacja / zwrot\",\"checksum\":\"1640c0b2f5afdb6b8cd408260a1a544308069d73608c993a9c65f00192d6281a\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://panel.dpay.pl/api/v1/pbl/check-refund-availability",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"transaction_id\":\"tx-1\",\"value\":\"5.00\",\"checksum\":\"03f78b07d3bbb2fbdababa45e64ffebfa6cf6fd9adef30fc09625e941e6ba3ae\"}"
+        },
+        {
+            "method": "GET",
+            "url": "https://panel.dpay.pl/api/v1/pbl/banks",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21"
+            },
+            "body": null
+        },
+        {
+            "method": "POST",
+            "url": "https://panel.dpay.pl/api/v1/pbl/banks",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"timestamp\":1784700000,\"checksum\":\"6438d831acc4cfb1f3bab9e749616317eee47c4d27f93a308bb686e85f87ea57\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://panel.dpay.pl/api/v1/pbl/withdraws/details",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"withdraw_id\":4242,\"checksum\":\"6aab621e53863b13044a361abbba01d9fb3ec7b5b834bb48a844d0507047ac15\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://panel.dpay.pl/api/v1/pbl/withdraws/details",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"timestamp\":1784700000,\"withdraw_id\":4242,\"checksum\":\"0604dafff2dd557e5eaac2bfbe47969a210595f66711cc3bfad729f03c24abd7\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/blik/aliases",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"alias_value\":\"a-1\",\"alias_type\":\"UID\",\"checksum\":\"13a2af56c258e301bba69ef61a79a6242f23f9ff58cfb231d7d0eef6732b7a4f\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/blik/aliases/unregister",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"alias_value\":\"a-1\",\"alias_type\":\"PAYID\",\"reason\":\"user request\",\"checksum\":\"13a2af56c258e301bba69ef61a79a6242f23f9ff58cfb231d7d0eef6732b7a4f\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/blik/recurring/status",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"alias_value\":\"a-1\",\"checksum\":\"13a2af56c258e301bba69ef61a79a6242f23f9ff58cfb231d7d0eef6732b7a4f\"}"
+        },
+        {
+            "method": "GET",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/public-key",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21"
+            },
+            "body": null
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx%201%2F2/pay/card-otp",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"email\":\"jan@example.com\",\"channelId\":86,\"cardHolderFirstName\":\"Jan\",\"cardHolderLastName\":\"Kowalski\",\"encryptedCardData\":\"BASE64DATA==\",\"deviceInfo\":{\"browserAcceptHeader\":\"text/html\",\"browserLanguage\":\"pl-PL\",\"browserColorDepth\":24,\"browserScreenHeight\":1080,\"browserScreenWidth\":1920,\"browserTZ\":-60,\"browserUserAgent\":\"Mozilla/5.0\",\"systemFamily\":\"Windows\",\"geoLocalization\":\"52.2297,21.0122\",\"deviceID\":\"device-abc\",\"applicationName\":\"Sklep Testowy\",\"browserJavaEnabled\":\"true\"},\"threeDsConfirmed\":true,\"dccDecision\":\"accept\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/pay/card-pre-auth",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"deviceInfo\":{\"browserAcceptHeader\":\"text/html\",\"browserLanguage\":\"pl-PL\",\"browserColorDepth\":24,\"browserScreenHeight\":1080,\"browserScreenWidth\":1920,\"browserTZ\":-60,\"browserUserAgent\":\"Mozilla/5.0\",\"systemFamily\":\"Windows\",\"geoLocalization\":\"52.2297,21.0122\",\"deviceID\":\"device-abc\",\"applicationName\":\"Sklep Testowy\",\"browserJavaEnabled\":\"true\"}}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/capture",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"amount\":29.99}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/cancellation",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/cancellation",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"amount\":1}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/pay/google-pay",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"email\":\"a@b.pl\",\"channelId\":90,\"xPayType\":\"GOOGLE_PAY\",\"xPayToken\":\"gp-token\",\"deviceInfo\":{\"browserAcceptHeader\":\"text/html\",\"browserLanguage\":\"pl-PL\",\"browserColorDepth\":24,\"browserScreenHeight\":1080,\"browserScreenWidth\":1920,\"browserTZ\":-60,\"browserUserAgent\":\"Mozilla/5.0\",\"systemFamily\":\"Windows\",\"geoLocalization\":\"52.2297,21.0122\",\"deviceID\":\"device-abc\",\"applicationName\":\"Sklep Testowy\",\"browserJavaEnabled\":\"true\"}}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/pay/apple-pay",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"xPayType\":\"APPLE_PAY_INIT\",\"deviceInfo\":{\"browserAcceptHeader\":\"text/html\",\"browserLanguage\":\"pl-PL\",\"browserColorDepth\":24,\"browserScreenHeight\":1080,\"browserScreenWidth\":1920,\"browserTZ\":-60,\"browserUserAgent\":\"Mozilla/5.0\",\"systemFamily\":\"Windows\",\"geoLocalization\":\"52.2297,21.0122\",\"deviceID\":\"device-abc\",\"applicationName\":\"Sklep Testowy\",\"browserJavaEnabled\":\"true\"}}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/pay/apple-pay",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"channelId\":91,\"xPayType\":\"APPLE_PAY\",\"xPayToken\":\"ap-token\",\"deviceInfo\":{\"browserAcceptHeader\":\"text/html\",\"browserLanguage\":\"pl-PL\",\"browserColorDepth\":24,\"browserScreenHeight\":1080,\"browserScreenWidth\":1920,\"browserTZ\":-60,\"browserUserAgent\":\"Mozilla/5.0\",\"systemFamily\":\"Windows\",\"geoLocalization\":\"52.2297,21.0122\",\"deviceID\":\"device-abc\",\"applicationName\":\"Sklep Testowy\",\"browserJavaEnabled\":\"true\"}}"
+        }
+    ],
+    "checksums": {
+        "secret_second_empty": "6586f5a4157c687c309cf16d078887853906113c2bb78ac6fbfda75c518d2757",
+        "secret_second_mixed": "018d8fab05798da9d03267c9696afebfe184c2d59f9975e764969dfda7256832",
+        "ordered_simple": "9508d77a17bdd44829ecc450214a3e356ca0cbe2f93c28012e3a5f6b39b4aa30",
+        "ordered_mixed": "4359d364e91b56ed48ba73ebf9df951b4d5381aec76895d52a3d2803ab301421"
+    },
+    "money_to_decimal": {
+        "1050": "10.50",
+        "1000": "10.00",
+        "5": "0.05",
+        "0": "0.00",
+        "-2000": "-20.00",
+        "-5": "-0.05",
+        "123456789": "1234567.89"
+    },
+    "money_try_from_api": [
+        3000,
+        0,
+        -700,
+        1050,
+        829,
+        10,
+        3000,
+        1000,
+        1050,
+        1050,
+        5,
+        -5,
+        null,
+        null,
+        null
+    ],
+    "float_cast": {
+        "29.99": "{\"amount\":29.99}",
+        "10.00": "{\"amount\":10}",
+        "0.05": "{\"amount\":0.05}",
+        "-20.00": "{\"amount\":-20}",
+        "1234567.89": "{\"amount\":1234567.89}"
+    },
+    "strval": [
+        "10",
+        "10.5",
+        "0.1",
+        "0.33333333333333",
+        "1.0E+25",
+        "-0",
+        "100",
+        "828.5",
+        "1",
+        "",
+        "42",
+        "abc"
+    ],
+    "ipn": [
+        {
+            "body": "{\"id\":\"tx-1\",\"amount\":\"29.99\",\"email\":\"jan@example.com\",\"type\":\"transfer\",\"attempt\":1,\"version\":2,\"custom\":\"order-1\",\"signature\":\"6493bb71d07d0cfee9ee0eea8f6af2a40beaac8b7e7b6b0b6d4b29e35801dd9d\"}",
+            "signature": "6493bb71d07d0cfee9ee0eea8f6af2a40beaac8b7e7b6b0b6d4b29e35801dd9d",
+            "id": "tx-1",
+            "amount": "29.99",
+            "email": "jan@example.com",
+            "type": "transfer",
+            "attempt": 1,
+            "version": 2,
+            "custom": "order-1",
+            "capture_payment_id": null
+        },
+        {
+            "body": "{\"id\":\"tx-2\",\"amount\":\"10.50\",\"type\":\"dcb\",\"attempt\":3,\"version\":1,\"signature\":\"e933e4cb4c32edf4062d12bb62cd6f549efa2fbb81327d1970174a239c421bf2\"}",
+            "signature": "e933e4cb4c32edf4062d12bb62cd6f549efa2fbb81327d1970174a239c421bf2",
+            "id": "tx-2",
+            "amount": "10.50",
+            "email": null,
+            "type": "dcb",
+            "attempt": 3,
+            "version": 1,
+            "custom": null,
+            "capture_payment_id": null
+        },
+        {
+            "body": "{\"id\":\"tx-3\",\"amount\":10.5,\"email\":\"\",\"type\":\"capture\",\"attempt\":\"1\",\"version\":\"1\",\"custom\":\"\",\"capture_payment_id\":\"cap-9\",\"signature\":\"b1a6bc1f7721123236547b97eeb55e2a770f748a87cc2fffedd43d69510f5bd0\"}",
+            "signature": "b1a6bc1f7721123236547b97eeb55e2a770f748a87cc2fffedd43d69510f5bd0",
+            "id": "tx-3",
+            "amount": "10.5",
+            "email": "",
+            "type": "capture",
+            "attempt": 1,
+            "version": 1,
+            "custom": "",
+            "capture_payment_id": "cap-9"
+        },
+        {
+            "body": "{\"id\":4,\"amount\":10,\"type\":\"transfer\",\"attempt\":1,\"version\":1,\"signature\":\"e8160e4f5d0e4d99da36205ca07eeeb487e97166048287c8550e0e7e67306f13\"}",
+            "signature": "e8160e4f5d0e4d99da36205ca07eeeb487e97166048287c8550e0e7e67306f13",
+            "id": "4",
+            "amount": "10",
+            "email": null,
+            "type": "transfer",
+            "attempt": 1,
+            "version": 1,
+            "custom": null,
+            "capture_payment_id": null
+        }
+    ],
+    "card_payload": "{\"PN\":\"4111111111111111\",\"SC\":\"123\",\"DT\":\"12\\/25\",\"ID\":\"tx-1\",\"TX\":1784700000}"
+}

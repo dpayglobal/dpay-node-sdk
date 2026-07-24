@@ -1,0 +1,738 @@
+{
+    "registered": [
+        {
+            "transaction_id": "tx-1",
+            "message": "https://secure.dpay.pl/pay/1",
+            "redirect_url": "https://secure.dpay.pl/pay/1",
+            "is_paid": false,
+            "is_internal_processing": false,
+            "ipksef": null,
+            "card_recurring_alias": null
+        },
+        {
+            "transaction_id": "12345",
+            "message": "Transaction paid",
+            "redirect_url": null,
+            "is_paid": true,
+            "is_internal_processing": false,
+            "ipksef": null,
+            "card_recurring_alias": null
+        },
+        {
+            "transaction_id": "tx-3",
+            "message": "Internal processing",
+            "redirect_url": null,
+            "is_paid": false,
+            "is_internal_processing": true,
+            "ipksef": "KSEF-1",
+            "card_recurring_alias": null
+        },
+        {
+            "transaction_id": "",
+            "message": "ok",
+            "redirect_url": null,
+            "is_paid": false,
+            "is_internal_processing": false,
+            "ipksef": null,
+            "card_recurring_alias": "al-1"
+        },
+        {
+            "transaction_id": "",
+            "message": "",
+            "redirect_url": null,
+            "is_paid": false,
+            "is_internal_processing": false,
+            "ipksef": null,
+            "card_recurring_alias": null
+        },
+        {
+            "transaction_id": "1",
+            "message": "HTTPS://A.PL",
+            "redirect_url": null,
+            "is_paid": false,
+            "is_internal_processing": false,
+            "ipksef": null,
+            "card_recurring_alias": null
+        },
+        {
+            "transaction_id": "",
+            "message": "",
+            "redirect_url": null,
+            "is_paid": false,
+            "is_internal_processing": false,
+            "ipksef": null,
+            "card_recurring_alias": null
+        }
+    ],
+    "transaction": [
+        {
+            "id": "tx-1",
+            "value": {
+                "minor": 2999,
+                "currency": "PLN",
+                "decimal": "29.99"
+            },
+            "status": "paid",
+            "is_paid": true,
+            "payment_method": "blik",
+            "creation_date": "2026-07-01 10:00:00",
+            "payment_date": "2026-07-01 10:05:00",
+            "is_settled": true,
+            "is_refunded": false,
+            "refunded_amount": {
+                "minor": 500,
+                "currency": "PLN",
+                "decimal": "5.00"
+            },
+            "available_refund_amount": {
+                "minor": 2499,
+                "currency": "PLN",
+                "decimal": "24.99"
+            },
+            "is_fully_refunded": false,
+            "is_direct": true,
+            "gateway_id": "gw-1",
+            "payer": {
+                "email": "a@b.pl"
+            },
+            "refunds": [
+                {
+                    "payment_id": "r-1",
+                    "value": {
+                        "minor": 500,
+                        "currency": "PLN",
+                        "decimal": "5.00"
+                    },
+                    "status": "paid",
+                    "creation_date": "2026-07-02",
+                    "payment_date": null
+                },
+                {
+                    "payment_id": "7",
+                    "value": {
+                        "minor": 0,
+                        "currency": "PLN",
+                        "decimal": "0.00"
+                    },
+                    "status": "paid",
+                    "creation_date": null,
+                    "payment_date": null
+                }
+            ]
+        },
+        {
+            "id": "42",
+            "value": {
+                "minor": 1000,
+                "currency": "PLN",
+                "decimal": "10.00"
+            },
+            "status": "captured",
+            "is_paid": true,
+            "payment_method": null,
+            "creation_date": null,
+            "payment_date": null,
+            "is_settled": false,
+            "is_refunded": false,
+            "refunded_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "available_refund_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "is_fully_refunded": false,
+            "is_direct": false,
+            "gateway_id": null,
+            "payer": [],
+            "refunds": []
+        },
+        {
+            "id": "t",
+            "value": {
+                "minor": 1050,
+                "currency": "PLN",
+                "decimal": "10.50"
+            },
+            "status": "brand_new",
+            "is_paid": false,
+            "payment_method": null,
+            "creation_date": null,
+            "payment_date": null,
+            "is_settled": true,
+            "is_refunded": false,
+            "refunded_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "available_refund_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "is_fully_refunded": false,
+            "is_direct": false,
+            "gateway_id": null,
+            "payer": [],
+            "refunds": []
+        },
+        {
+            "id": "",
+            "value": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "status": "",
+            "is_paid": false,
+            "payment_method": null,
+            "creation_date": null,
+            "payment_date": null,
+            "is_settled": false,
+            "is_refunded": false,
+            "refunded_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "available_refund_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "is_fully_refunded": false,
+            "is_direct": false,
+            "gateway_id": null,
+            "payer": [],
+            "refunds": []
+        },
+        {
+            "id": "",
+            "value": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "status": "",
+            "is_paid": false,
+            "payment_method": null,
+            "creation_date": null,
+            "payment_date": null,
+            "is_settled": false,
+            "is_refunded": false,
+            "refunded_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "available_refund_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "is_fully_refunded": false,
+            "is_direct": false,
+            "gateway_id": null,
+            "payer": [],
+            "refunds": []
+        },
+        {
+            "id": "",
+            "value": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "status": "",
+            "is_paid": false,
+            "payment_method": null,
+            "creation_date": null,
+            "payment_date": null,
+            "is_settled": false,
+            "is_refunded": false,
+            "refunded_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "available_refund_amount": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "is_fully_refunded": false,
+            "is_direct": false,
+            "gateway_id": null,
+            "payer": [],
+            "refunds": []
+        }
+    ],
+    "bank": [
+        {
+            "id": "1",
+            "name": "Bank",
+            "image": "https://a.pl/b.png",
+            "on_from": 0,
+            "on_to": 24,
+            "iterator": 3,
+            "is_test": false,
+            "type": "pbl"
+        },
+        {
+            "id": "5",
+            "name": "9",
+            "image": null,
+            "on_from": 8,
+            "on_to": 20,
+            "iterator": 2,
+            "is_test": true,
+            "type": null
+        },
+        {
+            "id": "",
+            "name": "",
+            "image": null,
+            "on_from": 0,
+            "on_to": 0,
+            "iterator": null,
+            "is_test": false,
+            "type": null
+        },
+        {
+            "id": "",
+            "name": "",
+            "image": null,
+            "on_from": 0,
+            "on_to": 0,
+            "iterator": null,
+            "is_test": false,
+            "type": null
+        },
+        {
+            "id": "",
+            "name": "",
+            "image": null,
+            "on_from": 0,
+            "on_to": 0,
+            "iterator": null,
+            "is_test": true,
+            "type": null
+        },
+        {
+            "id": "",
+            "name": "",
+            "image": null,
+            "on_from": 0,
+            "on_to": 0,
+            "iterator": null,
+            "is_test": false,
+            "type": null
+        }
+    ],
+    "refund": [
+        {
+            "is_accepted": true,
+            "message": "ok"
+        },
+        {
+            "is_accepted": false,
+            "message": null
+        },
+        {
+            "is_accepted": false,
+            "message": "42"
+        },
+        {
+            "is_accepted": false,
+            "message": null
+        },
+        {
+            "is_accepted": false,
+            "message": null
+        }
+    ],
+    "availability": [
+        {
+            "is_available": true,
+            "message": "mozna",
+            "http_status": 200
+        },
+        {
+            "is_available": false,
+            "message": "nie mozna",
+            "http_status": 200
+        },
+        {
+            "is_available": false,
+            "message": null,
+            "http_status": 200
+        },
+        {
+            "is_available": false,
+            "message": null,
+            "http_status": 200
+        }
+    ],
+    "payout": [
+        {
+            "id": 7,
+            "state": 1,
+            "is_waiting": false,
+            "is_processed": true,
+            "is_failed": false,
+            "net": {
+                "minor": 10050,
+                "currency": "PLN",
+                "decimal": "100.50"
+            },
+            "fee": {
+                "minor": 200,
+                "currency": "PLN",
+                "decimal": "2.00"
+            },
+            "gross": {
+                "minor": 10250,
+                "currency": "PLN",
+                "decimal": "102.50"
+            },
+            "creation_date": "2026-07-01",
+            "is_direct_settlement": true,
+            "nrb": "PL61",
+            "is_declined": false,
+            "decline_reason": "brak",
+            "decline_status": "X",
+            "receiver": {
+                "nrb": "PL61",
+                "title": "t",
+                "amount": {
+                    "minor": 1000,
+                    "currency": "PLN",
+                    "decimal": "10.00"
+                },
+                "service": "s",
+                "receiver_name": "Jan",
+                "receiver_address": "adres"
+            }
+        },
+        {
+            "id": 8,
+            "state": -1,
+            "is_waiting": false,
+            "is_processed": false,
+            "is_failed": true,
+            "net": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "fee": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "gross": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "creation_date": null,
+            "is_direct_settlement": false,
+            "nrb": null,
+            "is_declined": true,
+            "decline_reason": null,
+            "decline_status": null,
+            "receiver": null
+        },
+        {
+            "id": 9,
+            "state": 0,
+            "is_waiting": true,
+            "is_processed": false,
+            "is_failed": false,
+            "net": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "fee": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "gross": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "creation_date": null,
+            "is_direct_settlement": false,
+            "nrb": null,
+            "is_declined": false,
+            "decline_reason": null,
+            "decline_status": null,
+            "receiver": {
+                "nrb": null,
+                "title": null,
+                "amount": null,
+                "service": null,
+                "receiver_name": null,
+                "receiver_address": null
+            }
+        },
+        {
+            "id": 0,
+            "state": 0,
+            "is_waiting": true,
+            "is_processed": false,
+            "is_failed": false,
+            "net": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "fee": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "gross": {
+                "minor": 0,
+                "currency": "PLN",
+                "decimal": "0.00"
+            },
+            "creation_date": null,
+            "is_direct_settlement": false,
+            "nrb": null,
+            "is_declined": false,
+            "decline_reason": null,
+            "decline_status": null,
+            "receiver": null
+        }
+    ],
+    "blik_alias": [
+        {
+            "alias_value": "a-1",
+            "alias_type": "PAYID",
+            "status": "ACTIVE",
+            "is_active": true,
+            "expiration_date": "2027-01-01",
+            "apps": [
+                {
+                    "key": "k",
+                    "label": "l"
+                },
+                {
+                    "key": null,
+                    "label": null
+                }
+            ]
+        },
+        {
+            "alias_value": "99",
+            "alias_type": "UID",
+            "status": "INACTIVE",
+            "is_active": false,
+            "expiration_date": null,
+            "apps": []
+        },
+        {
+            "alias_value": "",
+            "alias_type": "UID",
+            "status": null,
+            "is_active": false,
+            "expiration_date": null,
+            "apps": []
+        }
+    ],
+    "blik_recurring": [
+        {
+            "alias_value": "a-1",
+            "alias_type": "UID",
+            "status": "ACTIVE",
+            "is_active": true,
+            "expiration_date": "2027-01-01",
+            "registration": {
+                "model": "M",
+                "frequency": "1M",
+                "limit_amt": 100,
+                "tot_limit_amt": 200,
+                "is_limit_amt_fixed": true,
+                "init_date": "2026-08-01",
+                "label": "sub",
+                "registered_at": "2026-07-01"
+            }
+        },
+        {
+            "alias_value": "",
+            "alias_type": "PAYID",
+            "status": null,
+            "is_active": false,
+            "expiration_date": null,
+            "registration": {
+                "model": null,
+                "frequency": null,
+                "limit_amt": null,
+                "tot_limit_amt": null,
+                "is_limit_amt_fixed": null,
+                "init_date": null,
+                "label": null,
+                "registered_at": null
+            }
+        },
+        {
+            "alias_value": "",
+            "alias_type": "PAYID",
+            "status": null,
+            "is_active": false,
+            "expiration_date": null,
+            "registration": null
+        },
+        {
+            "alias_value": "",
+            "alias_type": "PAYID",
+            "status": null,
+            "is_active": false,
+            "expiration_date": null,
+            "registration": null
+        }
+    ],
+    "card_result": [
+        {
+            "redirect_type": "SUCCESS",
+            "is_success": true,
+            "requires_three_ds_form": false,
+            "requires_redirect": false,
+            "has_dcc_offer": false,
+            "three_ds_form_html": null,
+            "redirect_url": null,
+            "dcc_offer": null
+        },
+        {
+            "redirect_type": "FORM",
+            "is_success": false,
+            "requires_three_ds_form": true,
+            "requires_redirect": false,
+            "has_dcc_offer": false,
+            "three_ds_form_html": "<form>",
+            "redirect_url": null,
+            "dcc_offer": null
+        },
+        {
+            "redirect_type": "URL",
+            "is_success": false,
+            "requires_three_ds_form": false,
+            "requires_redirect": true,
+            "has_dcc_offer": false,
+            "three_ds_form_html": null,
+            "redirect_url": "https://a.pl",
+            "dcc_offer": null
+        },
+        {
+            "redirect_type": "URL",
+            "is_success": false,
+            "requires_three_ds_form": false,
+            "requires_redirect": true,
+            "has_dcc_offer": false,
+            "three_ds_form_html": null,
+            "redirect_url": null,
+            "dcc_offer": null
+        },
+        {
+            "redirect_type": "FORM",
+            "is_success": false,
+            "requires_three_ds_form": true,
+            "requires_redirect": false,
+            "has_dcc_offer": false,
+            "three_ds_form_html": null,
+            "redirect_url": null,
+            "dcc_offer": null
+        },
+        {
+            "redirect_type": "DCC_OFFER",
+            "is_success": false,
+            "requires_three_ds_form": false,
+            "requires_redirect": false,
+            "has_dcc_offer": true,
+            "three_ds_form_html": null,
+            "redirect_url": null,
+            "dcc_offer": {
+                "currency_conversion_id": "cc-1",
+                "original_amount": {
+                    "minor": 2999,
+                    "currency": "PLN",
+                    "decimal": "29.99"
+                },
+                "converted_amount": {
+                    "minor": 705,
+                    "currency": "EUR",
+                    "decimal": "7.05"
+                },
+                "exchange_rate": 4.2543,
+                "valid_until": "2026-07-22T12:00:00Z",
+                "declaration_text": "Akceptuje",
+                "is_european_economic_area": true,
+                "markup": [
+                    {
+                        "rate": 0.03,
+                        "additional_info": "marza"
+                    },
+                    {
+                        "rate": 0,
+                        "additional_info": null
+                    }
+                ]
+            }
+        },
+        {
+            "redirect_type": "DCC_OFFER",
+            "is_success": false,
+            "requires_three_ds_form": false,
+            "requires_redirect": false,
+            "has_dcc_offer": true,
+            "three_ds_form_html": null,
+            "redirect_url": null,
+            "dcc_offer": {
+                "currency_conversion_id": "",
+                "original_amount": {
+                    "minor": 0,
+                    "currency": "PLN",
+                    "decimal": "0.00"
+                },
+                "converted_amount": {
+                    "minor": 0,
+                    "currency": "PLN",
+                    "decimal": "0.00"
+                },
+                "exchange_rate": 0,
+                "valid_until": "",
+                "declaration_text": "",
+                "is_european_economic_area": false,
+                "markup": []
+            }
+        },
+        {
+            "redirect_type": null,
+            "is_success": false,
+            "requires_three_ds_form": false,
+            "requires_redirect": false,
+            "has_dcc_offer": false,
+            "three_ds_form_html": null,
+            "redirect_url": null,
+            "dcc_offer": null
+        },
+        {
+            "redirect_type": null,
+            "is_success": false,
+            "requires_three_ds_form": false,
+            "requires_redirect": false,
+            "has_dcc_offer": false,
+            "three_ds_form_html": null,
+            "redirect_url": null,
+            "dcc_offer": null
+        }
+    ]
+}
