@@ -1,0 +1,53 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Ensure npm supports trusted publishing (OIDC)
+        run: npm install -g npm@latest
+      - run: npm ci
+
+      - name: Verify the git tag matches package.json version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Git tag '$GITHUB_REF_NAME' (version '$tag') does not match package.json version '$pkg'"
+            exit 1
+          fi
+          echo "Tag matches package.json version: $pkg"
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npx publint
+      - run: npx @arethetypeswrong/cli --pack . --profile node16
+
+      - name: Publish to npm via trusted publishing
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          case "$version" in
+            *-*) dist_tag="$(printf '%s' "${version#*-}" | cut -d. -f1)" ;;
+            *)   dist_tag="latest" ;;
+          esac
+          echo "Publishing $version with dist-tag '$dist_tag'"
+          npm publish --tag "$dist_tag"
