@@ -20,6 +20,10 @@ export interface RegisteredPayment {
   readonly isInternalProcessing: boolean
   /** Alias returned when a card mandate was registered. */
   readonly cardRecurringAlias: string | null
+  /** Alias of the recurring payment registered with this payment (`recurringRegistration`). */
+  readonly recurringAlias: string | null
+  /** Payment methods of that recurring payment, for example `['blik']`. */
+  readonly recurringMethods: readonly string[]
   readonly raw: Record<string, unknown>
 }
 
@@ -64,6 +68,8 @@ export interface Transaction {
 export function parseRegisteredPayment(data: Record<string, unknown>): RegisteredPayment {
   const message = scalarString(data, 'msg')
   const additional = record(data.additionalInfo)
+  const recurring = record(additional?.recurring_registration) ?? {}
+  const methods = Array.isArray(recurring.methods) ? recurring.methods : []
   return Object.freeze({
     transactionId: scalarString(data, 'transactionId'),
     message,
@@ -72,6 +78,8 @@ export function parseRegisteredPayment(data: Record<string, unknown>): Registere
     isPaid: message === 'Transaction paid',
     isInternalProcessing: message === 'Internal processing',
     cardRecurringAlias: additional === null ? null : strictString(additional, 'card_recurring_alias'),
+    recurringAlias: strictString(recurring, 'alias'),
+    recurringMethods: Object.freeze(methods.filter((method): method is string => typeof method === 'string')),
     raw: data,
   })
 }

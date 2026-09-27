@@ -7,7 +7,9 @@
             "is_paid": false,
             "is_internal_processing": false,
             "ipksef": null,
-            "card_recurring_alias": null
+            "card_recurring_alias": null,
+            "recurring_alias": null,
+            "recurring_methods": []
         },
         {
             "transaction_id": "12345",
@@ -16,7 +18,9 @@
             "is_paid": true,
             "is_internal_processing": false,
             "ipksef": null,
-            "card_recurring_alias": null
+            "card_recurring_alias": null,
+            "recurring_alias": null,
+            "recurring_methods": []
         },
         {
             "transaction_id": "tx-3",
@@ -25,7 +29,9 @@
             "is_paid": false,
             "is_internal_processing": true,
             "ipksef": "KSEF-1",
-            "card_recurring_alias": null
+            "card_recurring_alias": null,
+            "recurring_alias": null,
+            "recurring_methods": []
         },
         {
             "transaction_id": "",
@@ -34,7 +40,9 @@
             "is_paid": false,
             "is_internal_processing": false,
             "ipksef": null,
-            "card_recurring_alias": "al-1"
+            "card_recurring_alias": "al-1",
+            "recurring_alias": null,
+            "recurring_methods": []
         },
         {
             "transaction_id": "",
@@ -43,7 +51,9 @@
             "is_paid": false,
             "is_internal_processing": false,
             "ipksef": null,
-            "card_recurring_alias": null
+            "card_recurring_alias": null,
+            "recurring_alias": null,
+            "recurring_methods": []
         },
         {
             "transaction_id": "1",
@@ -52,7 +62,9 @@
             "is_paid": false,
             "is_internal_processing": false,
             "ipksef": null,
-            "card_recurring_alias": null
+            "card_recurring_alias": null,
+            "recurring_alias": null,
+            "recurring_methods": []
         },
         {
             "transaction_id": "",
@@ -61,7 +73,22 @@
             "is_paid": false,
             "is_internal_processing": false,
             "ipksef": null,
-            "card_recurring_alias": null
+            "card_recurring_alias": null,
+            "recurring_alias": null,
+            "recurring_methods": []
+        },
+        {
+            "transaction_id": "tx-rec",
+            "message": "Internal processing",
+            "redirect_url": null,
+            "is_paid": false,
+            "is_internal_processing": true,
+            "ipksef": null,
+            "card_recurring_alias": null,
+            "recurring_alias": "SUB-1",
+            "recurring_methods": [
+                "blik"
+            ]
         }
     ],
     "transaction": [
@@ -548,58 +575,6 @@
             "apps": []
         }
     ],
-    "blik_recurring": [
-        {
-            "alias_value": "a-1",
-            "alias_type": "UID",
-            "status": "ACTIVE",
-            "is_active": true,
-            "expiration_date": "2027-01-01",
-            "registration": {
-                "model": "M",
-                "frequency": "1M",
-                "limit_amt": 100,
-                "tot_limit_amt": 200,
-                "is_limit_amt_fixed": true,
-                "init_date": "2026-08-01",
-                "label": "sub",
-                "registered_at": "2026-07-01"
-            }
-        },
-        {
-            "alias_value": "",
-            "alias_type": "PAYID",
-            "status": null,
-            "is_active": false,
-            "expiration_date": null,
-            "registration": {
-                "model": null,
-                "frequency": null,
-                "limit_amt": null,
-                "tot_limit_amt": null,
-                "is_limit_amt_fixed": null,
-                "init_date": null,
-                "label": null,
-                "registered_at": null
-            }
-        },
-        {
-            "alias_value": "",
-            "alias_type": "PAYID",
-            "status": null,
-            "is_active": false,
-            "expiration_date": null,
-            "registration": null
-        },
-        {
-            "alias_value": "",
-            "alias_type": "PAYID",
-            "status": null,
-            "is_active": false,
-            "expiration_date": null,
-            "registration": null
-        }
-    ],
     "card_result": [
         {
             "redirect_type": "SUCCESS",
@@ -733,6 +708,157 @@
             "three_ds_form_html": null,
             "redirect_url": null,
             "dcc_offer": null
+        }
+    ],
+    "recurring_status": [
+        {
+            "alias": "SUB-1",
+            "method": "blik",
+            "status": "ACTIVE",
+            "is_active": true,
+            "expiration_date": "2027-01-01",
+            "registration": {
+                "transaction_id": "tx-2",
+                "label": "Subskrypcja",
+                "model": "M",
+                "frequency": "12M",
+                "limit_amt": 100000,
+                "tot_limit_amt": 500000,
+                "is_limit_amt_fixed": true,
+                "init_date": "2026-08-01",
+                "terms_url": "https://shop.test/regulamin",
+                "terms_version": "2026-09",
+                "registered_at": "2026-07-01T12:00:00+02:00"
+            }
+        },
+        {
+            "alias": "SUB-2",
+            "method": null,
+            "status": "UNREGISTERED",
+            "is_active": false,
+            "expiration_date": null,
+            "registration": {
+                "transaction_id": null,
+                "label": null,
+                "model": null,
+                "frequency": null,
+                "limit_amt": 100,
+                "tot_limit_amt": null,
+                "is_limit_amt_fixed": null,
+                "init_date": null,
+                "terms_url": null,
+                "terms_version": null,
+                "registered_at": null
+            }
+        },
+        {
+            "alias": "",
+            "method": null,
+            "status": null,
+            "is_active": false,
+            "expiration_date": null,
+            "registration": null
+        },
+        {
+            "alias": "",
+            "method": null,
+            "status": null,
+            "is_active": false,
+            "expiration_date": null,
+            "registration": null
+        }
+    ],
+    "recurring_retry": [
+        {
+            "transaction_id": "tx-4",
+            "status": "pending",
+            "is_pending": true,
+            "is_failed": false,
+            "count": 1,
+            "error_code": null,
+            "error_description": null
+        },
+        {
+            "transaction_id": "tx-5",
+            "status": "failed",
+            "is_pending": false,
+            "is_failed": true,
+            "count": 3,
+            "error_code": "INSUFFICIENT_FUNDS",
+            "error_description": "IssId: 1"
+        },
+        {
+            "transaction_id": "42",
+            "status": null,
+            "is_pending": false,
+            "is_failed": false,
+            "count": null,
+            "error_code": null,
+            "error_description": null
+        },
+        {
+            "transaction_id": "",
+            "status": null,
+            "is_pending": false,
+            "is_failed": false,
+            "count": null,
+            "error_code": null,
+            "error_description": null
+        }
+    ],
+    "webhook_event": [
+        {
+            "id": "evt_01k6a8q2m4pz7h8c3v5n9t2x6y",
+            "type": "payment.succeeded",
+            "api_version": "2026-10-01",
+            "created": "2026-09-27T10:05:00Z",
+            "livemode": true,
+            "service": "test_service",
+            "merchant_ref": null,
+            "object_type": "payment",
+            "object": {
+                "object": "payment",
+                "id": "tx-1",
+                "amount": 2999,
+                "currency": "PLN"
+            }
+        },
+        {
+            "id": "evt_01k6a8q2m4pz7h8c3v5n9t2x6a",
+            "type": "recurring_payment.canceled",
+            "api_version": null,
+            "created": "2026-09-27T10:06:00Z",
+            "livemode": false,
+            "service": null,
+            "merchant_ref": "m-7",
+            "object_type": "recurring_payment",
+            "object": {
+                "object": "recurring_payment",
+                "alias": "SUB-1",
+                "canceled_by": "merchant"
+            }
+        },
+        {
+            "id": "",
+            "type": "",
+            "api_version": null,
+            "created": null,
+            "livemode": true,
+            "service": null,
+            "merchant_ref": null,
+            "object_type": null,
+            "object": []
+        },
+        {
+            "id": "",
+            "type": "",
+            "api_version": null,
+            "created": null,
+            "livemode": true,
+            "service": null,
+            "merchant_ref": null,
+            "object_type": null,
+            "object": []
         }
     ]
 }

@@ -23,7 +23,11 @@ export function mapError(response: ApiResponse): ApiError {
   if (typeof data.message === 'string') message = data.message
   else if (typeof data.msg === 'string') message = data.msg
 
-  const errorCode = typeof data.errorcode === 'string' ? data.errorcode : null
+  // Cards API, Events API and webhook errors carry `code`; older endpoints `errorcode`
+  let errorCode: string | null = null
+  if (typeof data.code === 'string') errorCode = data.code
+  else if (typeof data.errorcode === 'string') errorCode = data.errorcode
+  const reason = typeof data.reason === 'string' ? data.reason : null
   const fieldErrors = normalizeFieldErrors(data.errors)
 
   if (status === 429) {
@@ -36,14 +40,14 @@ export function mapError(response: ApiResponse): ApiError {
       rawBody,
     )
   }
-  if (status === 401) return new AuthenticationError(message, status, errorCode, fieldErrors, rawBody)
-  if (status === 403) return new AccessDeniedError(message, status, errorCode, fieldErrors, rawBody)
-  if (status === 404) return new NotFoundError(message, status, errorCode, fieldErrors, rawBody)
+  if (status === 401) return new AuthenticationError(message, status, errorCode, fieldErrors, rawBody, reason)
+  if (status === 403) return new AccessDeniedError(message, status, errorCode, fieldErrors, rawBody, reason)
+  if (status === 404) return new NotFoundError(message, status, errorCode, fieldErrors, rawBody, reason)
   if (status === 400 || status === 422) {
-    return new InvalidRequestError(message, status, errorCode, fieldErrors, rawBody)
+    return new InvalidRequestError(message, status, errorCode, fieldErrors, rawBody, reason)
   }
-  if (status >= 500) return new ApiServerError(message, status, errorCode, fieldErrors, rawBody)
-  return new ApiError(message, status, errorCode, fieldErrors, rawBody)
+  if (status >= 500) return new ApiServerError(message, status, errorCode, fieldErrors, rawBody, reason)
+  return new ApiError(message, status, errorCode, fieldErrors, rawBody, reason)
 }
 
 function normalizeFieldErrors(errors: unknown): Record<string, string[]> {

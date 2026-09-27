@@ -8,8 +8,10 @@ import { ApiRequestor } from './internal/requestor.js'
 import { IpnService } from './ipn/service.js'
 import { PaymentService } from './payment/service.js'
 import { PayoutService } from './payout/service.js'
+import { RecurringService } from './recurring/service.js'
 import { RefundService } from './refund/service.js'
 import { SDK_VERSION } from './version.js'
+import { EventService } from './webhook/service.js'
 
 /** Entry point of the SDK. One instance per payment point. */
 export class DPayClient {
@@ -21,12 +23,16 @@ export class DPayClient {
   readonly refunds: RefundService
   /** List banks available on the payment page. */
   readonly banks: BankService
-  /** Register, unregister and inspect BLIK aliases. */
+  /** Register, unregister and inspect BLIK OneClick aliases. */
   readonly blik: BlikService
   /** Server-to-server card payments, wallets and pre-authorizations. */
   readonly cards: CardService
   /** Read the state of payouts. */
   readonly payouts: PayoutService
+  /** Status, retries and cancellation of recurring payments. */
+  readonly recurring: RecurringService
+  /** Event history of the service (Events API) - the same events as the webhooks. */
+  readonly events: EventService
   /** Verify incoming IPN notifications. */
   readonly ipn: IpnService
 
@@ -46,6 +52,8 @@ export class DPayClient {
     this.blik = new BlikService(api)
     this.cards = new CardService(api)
     this.payouts = new PayoutService(api)
+    this.recurring = new RecurringService(api)
+    this.events = new EventService(api)
     this.ipn = new IpnService(config)
   }
 }

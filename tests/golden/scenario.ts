@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { DPayClient, Money } from '../../src/index.js'
+import { DPayClient, Money, RecurringMethod, RecurringModel, WebhookTarget } from '../../src/index.js'
 import { ChecksumCalculator } from '../../src/internal/checksum.js'
 import { phpJsonEncode, phpStrval } from '../../src/internal/php.js'
 import { constructIpnEvent } from '../../src/ipn/verifier.js'
@@ -92,33 +92,38 @@ export async function runRequestScenario(): Promise<Record<string, unknown>> {
     },
   })
 
+  // [1] rejestracja płatności cyklicznej: transfers + kod BLIK + recurring_registration
   transport.queueJson(200, { transactionId: 'tx-2', msg: 'Transaction paid' })
   await dpay.payments.register({
     amount: Money.pln(1000),
-    transactionType: 'blik_recurring',
+    transactionType: 'transfers',
     urls,
     userAgent: 'UA/1.0',
     userIp: '10.0.0.1',
     blikCode: '123456',
-    registerBlikRecurringAlias: {
+    recurringRegistration: {
       label: 'Subskrypcja',
-      model: 'M',
+      model: RecurringModel.M,
+      termsUrl: 'https://shop.test/regulamin',
+      alias: 'SUB-1',
       frequency: '12M',
-      value: Money.pln(4999),
       limitAmt: 100000,
       totLimitAmt: 500000,
       limitAmtFixed: true,
       expirationDate: '2027-01-01',
       initDate: '2026-08-01',
+      methods: [RecurringMethod.BLIK],
+      termsVersion: '2026-09',
     },
   })
 
+  // [2] alias OneClick tylko UID
   transport.queueJson(200, { transactionId: 'tx-3', msg: 'ok' })
   await dpay.payments.register({
     amount: Money.of(500, 'CZK'),
     transactionType: 'card_recurring',
     urls,
-    registerBlikAlias: { label: 'Moj alias', type: 'PAYID' },
+    registerBlikAlias: { label: 'Moj alias', type: 'UID' },
     registerCardRecurring: {
       label: 'Mandat',
       frequency: 'MONTHLY',
@@ -157,11 +162,13 @@ export async function runRequestScenario(): Promise<Record<string, unknown>> {
   transport.queueJson(200, { data: { alias_value: 'a-1', alias_type: 'UID', status: 'ACTIVE' } })
   await dpay.blik.alias({ aliasValue: 'a-1' })
 
+  // [12] wyrejestrowanie aliasu OneClick (UID)
   transport.queueJson(200, { data: {} })
-  await dpay.blik.unregisterAlias({ aliasValue: 'a-1', aliasType: 'PAYID', reason: 'user request' })
+  await dpay.blik.unregisterAlias({ aliasValue: 'a-1', aliasType: 'UID', reason: 'user request' })
 
-  transport.queueJson(200, { data: { alias_value: 'a-1' } })
-  await dpay.blik.recurringStatus({ aliasValue: 'a-1' })
+  // [13] status płatności cyklicznej - wspólne API
+  transport.queueJson(200, { data: { alias: 'a-1' } })
+  await dpay.recurring.status('a-1')
 
   transport.queueText(200, '-----BEGIN PUBLIC KEY-----\nAAA\n-----END PUBLIC KEY-----\n')
   await dpay.cards.publicKey()
@@ -200,6 +207,56 @@ export async function runRequestScenario(): Promise<Record<string, unknown>> {
 
   transport.queueJson(200, successBody)
   await dpay.cards.applePay('tx-1', { token: 'ap-token', deviceInfo, channelId: 91 })
+
+  // [23] obciążenie płatności cyklicznej bez IPN, z kontekstem klienta, adresem zdarzeń i referencją
+  transport.queueJson(200, { error: false, msg: 'Internal processing', status: true, transactionId: 'tx-4' })
+  await dpay.payments.register({
+    amount: Money.pln(4999),
+    transactionType: 'transfers',
+    urls: { success: urls.success, fail: urls.fail },
+    recurringAlias: 'SUB-1',
+    userAgent: 'UA/1.0',
+    userIp: '10.0.0.1',
+    description: 'Abonament 10/2026',
+    webhook: WebhookTarget.create('https://shop.test/webhooks', ['payment.succeeded', 'payment.failed']),
+    reference: 'order-77',
+  })
+
+  // [24] ponowienie obciążenia
+  transport.queueJson(200, {
+    status: 'success',
+    data: { transactionId: 'tx-4', retry: { status: 'pending', count: 1 } },
+  })
+  await dpay.recurring.retry('tx-4')
+
+  // [25] anulowanie płatności cyklicznej
+  transport.queueJson(200, { status: 'success', data: { alias: 'SUB-1', status: 'UNREGISTERED' } })
+  await dpay.recurring.cancel('SUB-1', { reason: 'Rezygnacja' })
+
+  // [26] zwrot z adresem zdarzeń (webhook w sumie kontrolnej)
+  transport.queueJson(200, { status: 'success', refund: true })
+  await dpay.refunds.create({
+    transactionId: 'tx-1',
+    amount: Money.pln(500),
+    reason: 'reklamacja',
+    webhook: WebhookTarget.create('https://shop.test/webhooks/refunds', ['refund.succeeded', 'refund.failed']),
+  })
+
+  // [27] capture z adresem zdarzenia payment.captured
+  transport.queueJson(200, successBody)
+  await dpay.cards.capture('tx-1', {
+    amount: Money.pln(1500),
+    webhook: WebhookTarget.create('https://shop.test/webhooks/captures', ['payment.captured']),
+  })
+
+  // [28] Events API ze stałym znacznikiem czasu
+  transport.queueJson(200, { status: 'success', data: [], has_more: false, next_starting_after: null })
+  await dpay.events.list({
+    types: ['payment.succeeded', 'refund.failed'],
+    createdFrom: '2026-09-01T00:00:00Z',
+    limit: 10,
+    timestamp: TIMESTAMP,
+  })
 
   out.calls = transport.requests.map((request) => ({
     method: request.method,

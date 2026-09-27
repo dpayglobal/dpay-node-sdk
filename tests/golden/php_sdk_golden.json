@@ -15,20 +15,20 @@
             "url": "https://api-payments.dpay.pl/api/v1_0/payments/register",
             "headers": {
                 "Accept": "application/json",
-                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
                 "Content-Type": "application/json"
             },
-            "body": "{\"service\":\"test_service\",\"value\":\"10.00\",\"transactionType\":\"blik_recurring\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"user_agent\":\"UA/1.0\",\"user_ip\":\"10.0.0.1\",\"blik_code\":\"123456\",\"register_blik_recurring_alias\":{\"label\":\"Subskrypcja\",\"type\":\"PAYID\",\"model\":\"M\",\"frequency\":\"12M\",\"value\":\"49.99\",\"limit_amt\":100000,\"tot_limit_amt\":500000,\"is_limit_amt_fixed\":true,\"expiration_date\":\"2027-01-01\",\"init_date\":\"2026-08-01\"},\"checksum\":\"26d9b0eb1a44b63f8875fad87aad0956189e620a9e4c1443f3f347bc4e6bb52d\"}"
+            "body": "{\"service\":\"test_service\",\"value\":\"10.00\",\"transactionType\":\"transfers\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"user_agent\":\"UA/1.0\",\"user_ip\":\"10.0.0.1\",\"blik_code\":\"123456\",\"recurring_registration\":{\"label\":\"Subskrypcja\",\"alias\":\"SUB-1\",\"model\":\"M\",\"frequency\":\"12M\",\"limit_amt\":100000,\"tot_limit_amt\":500000,\"is_limit_amt_fixed\":true,\"expiration_date\":\"2027-01-01\",\"init_date\":\"2026-08-01\",\"methods\":[\"blik\"],\"terms_url\":\"https://shop.test/regulamin\",\"terms_version\":\"2026-09\"},\"checksum\":\"26d9b0eb1a44b63f8875fad87aad0956189e620a9e4c1443f3f347bc4e6bb52d\"}"
         },
         {
             "method": "POST",
             "url": "https://api-payments.dpay.pl/api/v1_0/payments/register",
             "headers": {
                 "Accept": "application/json",
-                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
                 "Content-Type": "application/json"
             },
-            "body": "{\"service\":\"test_service\",\"value\":\"5.00\",\"transactionType\":\"card_recurring\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"register_blik_alias\":{\"label\":\"Moj alias\",\"type\":\"PAYID\"},\"register_card_recurring\":{\"label\":\"Mandat\",\"frequency\":\"MONTHLY\",\"limit_amt\":20000,\"tot_limit_amt\":100000,\"is_limit_amt_fixed\":false,\"expiration_date\":\"2028-12-31\",\"init_date\":\"2026-09-01\"},\"checksum\":\"bb6346930c49321bad9714039e350519df459075a20c94bd1ef8f79ba26bfd0c\"}"
+            "body": "{\"service\":\"test_service\",\"value\":\"5.00\",\"transactionType\":\"card_recurring\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"register_blik_alias\":{\"label\":\"Moj alias\",\"type\":\"UID\"},\"register_card_recurring\":{\"label\":\"Mandat\",\"frequency\":\"MONTHLY\",\"limit_amt\":20000,\"tot_limit_amt\":100000,\"is_limit_amt_fixed\":false,\"expiration_date\":\"2028-12-31\",\"init_date\":\"2026-09-01\"},\"checksum\":\"bb6346930c49321bad9714039e350519df459075a20c94bd1ef8f79ba26bfd0c\"}"
         },
         {
             "method": "POST",
@@ -124,20 +124,20 @@
             "url": "https://api-payments.dpay.pl/api/v1_0/payments/blik/aliases/unregister",
             "headers": {
                 "Accept": "application/json",
-                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
                 "Content-Type": "application/json"
             },
-            "body": "{\"service\":\"test_service\",\"alias_value\":\"a-1\",\"alias_type\":\"PAYID\",\"reason\":\"user request\",\"checksum\":\"13a2af56c258e301bba69ef61a79a6242f23f9ff58cfb231d7d0eef6732b7a4f\"}"
+            "body": "{\"service\":\"test_service\",\"alias_value\":\"a-1\",\"alias_type\":\"UID\",\"reason\":\"user request\",\"checksum\":\"13a2af56c258e301bba69ef61a79a6242f23f9ff58cfb231d7d0eef6732b7a4f\"}"
         },
         {
             "method": "POST",
-            "url": "https://api-payments.dpay.pl/api/v1_0/payments/blik/recurring/status",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/recurring/status",
             "headers": {
                 "Accept": "application/json",
-                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
                 "Content-Type": "application/json"
             },
-            "body": "{\"service\":\"test_service\",\"alias_value\":\"a-1\",\"checksum\":\"13a2af56c258e301bba69ef61a79a6242f23f9ff58cfb231d7d0eef6732b7a4f\"}"
+            "body": "{\"service\":\"test_service\",\"alias\":\"a-1\",\"checksum\":\"13a2af56c258e301bba69ef61a79a6242f23f9ff58cfb231d7d0eef6732b7a4f\"}"
         },
         {
             "method": "GET",
@@ -173,30 +173,30 @@
             "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/capture",
             "headers": {
                 "Accept": "application/json",
-                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
                 "Content-Type": "application/json"
             },
-            "body": "{\"amount\":29.99}"
+            "body": "{\"service\":\"test_service\",\"amount\":29.99,\"checksum\":\"835182d11c896a412912bee6fb3baf0670051bde45ec7a1810c1748ec143bc27\"}"
         },
         {
             "method": "POST",
             "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/cancellation",
             "headers": {
                 "Accept": "application/json",
-                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
                 "Content-Type": "application/json"
             },
-            "body": "{}"
+            "body": "{\"service\":\"test_service\",\"checksum\":\"4f7656fc0700af82b74a940df21fd3075311bbb71dfd7266ed0895e5f459e368\"}"
         },
         {
             "method": "POST",
             "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/cancellation",
             "headers": {
                 "Accept": "application/json",
-                "User-Agent": "dpay-php-sdk/0.1.1 php/8.4.21",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
                 "Content-Type": "application/json"
             },
-            "body": "{\"amount\":1}"
+            "body": "{\"service\":\"test_service\",\"amount\":1,\"checksum\":\"1b0c0c82a4af6dec880d17a3f46ca0821ed36467afbdffb43ceafe5bc5f57eca\"}"
         },
         {
             "method": "POST",
@@ -227,6 +227,66 @@
                 "Content-Type": "application/json"
             },
             "body": "{\"channelId\":91,\"xPayType\":\"APPLE_PAY\",\"xPayToken\":\"ap-token\",\"deviceInfo\":{\"browserAcceptHeader\":\"text/html\",\"browserLanguage\":\"pl-PL\",\"browserColorDepth\":24,\"browserScreenHeight\":1080,\"browserScreenWidth\":1920,\"browserTZ\":-60,\"browserUserAgent\":\"Mozilla/5.0\",\"systemFamily\":\"Windows\",\"geoLocalization\":\"52.2297,21.0122\",\"deviceID\":\"device-abc\",\"applicationName\":\"Sklep Testowy\",\"browserJavaEnabled\":\"true\"}}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/register",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"value\":\"49.99\",\"transactionType\":\"transfers\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"description\":\"Abonament 10/2026\",\"user_agent\":\"UA/1.0\",\"user_ip\":\"10.0.0.1\",\"recurring_alias\":\"SUB-1\",\"webhook\":{\"url\":\"https://shop.test/webhooks\",\"events\":[\"payment.succeeded\",\"payment.failed\"]},\"reference\":\"order-77\",\"checksum\":\"8374dafe4b36b0f0ce50b437440d6c295454d075ee06d1d9da4901ece1d8dade\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/recurring/retry",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"transaction_id\":\"tx-4\",\"checksum\":\"babdcd1baa73fb8a31f4322d17838f5c8bd15dbed6b9244119318322c9eb20d5\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/payments/recurring/cancel",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"alias\":\"SUB-1\",\"reason\":\"Rezygnacja\",\"checksum\":\"0d149a542e5739f452a5748e1cffc238b328fbc7c8c79b50a069bb6883d2e287\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://panel.dpay.pl/api/v1/pbl/refund",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"transaction_id\":\"tx-1\",\"value\":\"5.00\",\"reason\":\"reklamacja\",\"webhook\":{\"url\":\"https://shop.test/webhooks/refunds\",\"events\":[\"refund.succeeded\",\"refund.failed\"]},\"checksum\":\"18b3504d574acc9e2250f1937d7b3f40c6d9d96a1a535f1efe0dfc1c1409ecab\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/cards/payment/tx-1/capture",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"amount\":15,\"webhook\":{\"url\":\"https://shop.test/webhooks/captures\",\"events\":[\"payment.captured\"]},\"checksum\":\"424c5c1916bdffb3cfc28f8421973c9b7a68b2cddb4f6f0e6e237fc9f45ede5c\"}"
+        },
+        {
+            "method": "POST",
+            "url": "https://api-payments.dpay.pl/api/v1_0/events",
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
+                "Content-Type": "application/json"
+            },
+            "body": "{\"service\":\"test_service\",\"timestamp\":1784700000,\"types\":[\"payment.succeeded\",\"refund.failed\"],\"created_from\":\"2026-09-01T00:00:00Z\",\"limit\":10,\"checksum\":\"908bc14e0508b40fd902bda92fb53267c2c3905553d07ebd394f2884ae4572bf\"}"
         }
     ],
     "checksums": {

@@ -1,7 +1,12 @@
 import { isNumeric, isScalar, phpInt, phpStrval } from '../internal/php.js'
 
 /** Kind of notification dpay sent. */
-export const IpnType = { TRANSFER: 'transfer', CAPTURE: 'capture', DCB: 'dcb' } as const
+export const IpnType = {
+  TRANSFER: 'transfer',
+  /** @deprecated dpay no longer sends capture IPNs - use the `payment.captured` webhook event. */
+  CAPTURE: 'capture',
+  DCB: 'dcb',
+} as const
 
 export type IpnType = (typeof IpnType)[keyof typeof IpnType]
 
@@ -22,9 +27,11 @@ export interface IpnEvent {
   readonly version: number
   /** Whatever you passed as `custom` at registration time. */
   readonly custom: string | null
+  /** @deprecated dpay no longer sends capture IPNs - use the `payment.captured` webhook event. */
   readonly capturePaymentId: string | null
   readonly signature: string
   readonly isTransfer: boolean
+  /** @deprecated dpay no longer sends capture IPNs - use the `payment.captured` webhook event. */
   readonly isCapture: boolean
   readonly isDcb: boolean
   readonly raw: Record<string, unknown>

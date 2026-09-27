@@ -12,19 +12,27 @@ const GOLDEN_LEAVES = leaves(GOLDEN, { emptyArrayIsObject: true })
 const ACTUAL_LEAVES = leaves(ACTUAL, { emptyArrayIsObject: true })
 
 describe('response parity with the PHP SDK', () => {
-  it('covers all nine model groups', () => {
+  it('covers all eleven model groups', () => {
     expect(Object.keys(ACTUAL).sort()).toEqual(Object.keys(GOLDEN).sort())
     expect(Object.keys(GOLDEN).sort()).toEqual([
       'availability',
       'bank',
       'blik_alias',
-      'blik_recurring',
       'card_result',
       'payout',
+      'recurring_retry',
+      'recurring_status',
       'refund',
       'registered',
       'transaction',
+      'webhook_event',
     ])
+  })
+
+  it('treats an empty PHP array as an empty object or list', () => {
+    const events = ACTUAL.webhook_event as Array<{ object: Record<string, unknown> }>
+    expect(events[2]?.object).toEqual({})
+    expect((GOLDEN.webhook_event as Array<{ object: unknown }>)[2]?.object).toEqual([])
   })
 
   it('produces exactly the same set of leaves', () => {

@@ -16,7 +16,7 @@ export function payoutDetailsOperation(
   const body: Record<string, unknown> = { service }
   if (params.timestamp !== undefined) body.timestamp = params.timestamp
   body.withdraw_id = params.withdrawId
-  body.checksum = checksum.orderedBody(Object.values(body))
+  body.checksum = checksum.orderedBody(body)
   return {
     method: 'POST',
     host: PANEL,

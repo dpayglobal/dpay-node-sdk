@@ -1,68 +1,422 @@
 {
-  "registered": [
-    {"transactionId": "tx-1", "msg": "https://secure.dpay.pl/pay/1"},
-    {"transactionId": 12345, "msg": "Transaction paid"},
-    {"transactionId": "tx-3", "msg": "Internal processing", "ipksef": "KSEF-1"},
-    {"msg": "ok", "additionalInfo": {"card_recurring_alias": "al-1"}},
-    {"transactionId": null, "msg": null, "ipksef": 5, "additionalInfo": "nope"},
-    {"transactionId": true, "msg": "HTTPS://A.PL"},
-    {}
-  ],
-  "transaction": [
-    {"transaction": {"id": "tx-1", "value": "29.99", "status": "paid", "payment_method": "blik", "creation_date": "2026-07-01 10:00:00", "payment_date": "2026-07-01 10:05:00", "settled": 1, "refunded": 0, "refunded_amount": 5, "available_refund_amount": 24.99, "fully_refunded": false, "direct": true, "gateway_id": "gw-1"}, "payer": {"email": "a@b.pl"}, "refunds": [{"payment_id": "r-1", "value": "5.00", "status": "paid", "creation_date": "2026-07-02", "payment_date": null}, {"payment_id": 7, "value": "bad"}, "junk", 5]},
-    {"transaction": {"id": 42, "value": 10, "status": "captured"}},
-    {"transaction": {"id": "t", "value": 10.5, "status": "brand_new", "settled": "yes", "payment_date": 123}},
-    {"transaction": "not-an-object", "payer": "nope", "refunds": "nope"},
-    {},
-    {"transaction": {"value": null, "status": null, "refunded_amount": "abc"}}
-  ],
-  "bank": [
-    {"id": "1", "name": "Bank", "image": "https://a.pl/b.png", "on_from": 0, "on_to": 24, "iterator": 3, "test": false, "type": "pbl"},
-    {"id": 5, "name": 9, "image": 7, "on_from": "8", "on_to": "20.9", "iterator": "2", "test": 1, "type": 5},
-    {"test": "0"},
-    {"test": ""},
-    {"test": "false"},
-    {}
-  ],
-  "refund": [
-    {"status": "success", "refund": true, "message": "ok"},
-    {"status": "success", "refund": "true"},
-    {"status": "error", "refund": false, "message": 42},
-    {"refund": true},
-    {}
-  ],
-  "availability": [
-    {"refund": true, "message": "mozna"},
-    {"refund": false, "message": "nie mozna"},
-    {"refund": "true"},
-    {}
-  ],
-  "payout": [
-    {"id": 7, "state": 1, "net": 100.5, "fee": 2, "gross": "102.50", "creation_date": "2026-07-01", "direct_settlement": 1, "nrb": "PL61", "declined": 0, "decline_reason": "brak", "decline_status": "X", "receiver": {"nrb": "PL61", "title": "t", "amount": 10.0, "service": "s", "receiverName": "Jan", "receiverAddress": "adres"}},
-    {"id": "8", "state": "-1", "declined": "1", "direct_settlement": "0", "receiver": "nope"},
-    {"id": 9, "state": 0, "net": "abc", "receiver": {}},
-    {}
-  ],
-  "blik_alias": [
-    {"alias_value": "a-1", "alias_type": "PAYID", "status": "ACTIVE", "expiration_date": "2027-01-01", "apps": [{"key": "k", "label": "l"}, "junk", {"key": 5}]},
-    {"alias_value": 99, "status": "INACTIVE", "apps": "nope"},
-    {}
-  ],
-  "blik_recurring": [
-    {"alias_value": "a-1", "alias_type": "UID", "status": "ACTIVE", "expiration_date": "2027-01-01", "registration": {"model": "M", "frequency": "1M", "limit_amt": 100, "tot_limit_amt": 200, "is_limit_amt_fixed": true, "init_date": "2026-08-01", "label": "sub", "registered_at": "2026-07-01"}},
-    {"registration": {"limit_amt": "100", "is_limit_amt_fixed": "true"}},
-    {"registration": "nope"},
-    {}
-  ],
-  "card_result": [
-    {"success": true, "message": {"redirectType": "SUCCESS"}},
-    {"success": true, "message": {"redirectType": "FORM", "redirectText": "PGZvcm0+"}},
-    {"success": true, "message": {"redirectType": "URL", "redirectText": "aHR0cHM6Ly9hLnBs"}},
-    {"success": true, "message": {"redirectType": "URL", "redirectText": "!!!not-base64"}},
-    {"success": true, "message": {"redirectType": "FORM", "redirectText": ""}},
-    {"success": true, "message": {"redirectType": "DCC_OFFER", "dccOffer": {"currencyConversionId": "cc-1", "originalAmount": 29.99, "originalCurrency": "PLN", "convertedAmount": 7.05, "convertedCurrency": "EUR", "exchangeRate": "4.2543", "validUntil": "2026-07-22T12:00:00Z", "declarationText": "Akceptuje", "europeanEconomicArea": true, "markup": [{"rate": 0.03, "additionalInfo": "marza"}, {"rate": "bad"}, "junk"]}}},
-    {"success": true, "message": {"redirectType": "DCC_OFFER", "dccOffer": {"originalCurrency": 5, "convertedCurrency": "xyz", "originalAmount": "abc", "exchangeRate": "nope"}}},
-    {"success": true, "message": "not-an-object"},
-    {"success": true}
-  ]
+    "registered": [
+        {
+            "transactionId": "tx-1",
+            "msg": "https://secure.dpay.pl/pay/1"
+        },
+        {
+            "transactionId": 12345,
+            "msg": "Transaction paid"
+        },
+        {
+            "transactionId": "tx-3",
+            "msg": "Internal processing",
+            "ipksef": "KSEF-1"
+        },
+        {
+            "msg": "ok",
+            "additionalInfo": {
+                "card_recurring_alias": "al-1"
+            }
+        },
+        {
+            "transactionId": null,
+            "msg": null,
+            "ipksef": 5,
+            "additionalInfo": "nope"
+        },
+        {
+            "transactionId": true,
+            "msg": "HTTPS://A.PL"
+        },
+        {},
+        {
+            "error": false,
+            "msg": "Internal processing",
+            "status": true,
+            "transactionId": "tx-rec",
+            "additionalInfo": {
+                "recurring_registration": {
+                    "alias": "SUB-1",
+                    "methods": [
+                        "blik",
+                        7
+                    ]
+                }
+            }
+        }
+    ],
+    "transaction": [
+        {
+            "transaction": {
+                "id": "tx-1",
+                "value": "29.99",
+                "status": "paid",
+                "payment_method": "blik",
+                "creation_date": "2026-07-01 10:00:00",
+                "payment_date": "2026-07-01 10:05:00",
+                "settled": 1,
+                "refunded": 0,
+                "refunded_amount": 5,
+                "available_refund_amount": 24.99,
+                "fully_refunded": false,
+                "direct": true,
+                "gateway_id": "gw-1"
+            },
+            "payer": {
+                "email": "a@b.pl"
+            },
+            "refunds": [
+                {
+                    "payment_id": "r-1",
+                    "value": "5.00",
+                    "status": "paid",
+                    "creation_date": "2026-07-02",
+                    "payment_date": null
+                },
+                {
+                    "payment_id": 7,
+                    "value": "bad"
+                },
+                "junk",
+                5
+            ]
+        },
+        {
+            "transaction": {
+                "id": 42,
+                "value": 10,
+                "status": "captured"
+            }
+        },
+        {
+            "transaction": {
+                "id": "t",
+                "value": 10.5,
+                "status": "brand_new",
+                "settled": "yes",
+                "payment_date": 123
+            }
+        },
+        {
+            "transaction": "not-an-object",
+            "payer": "nope",
+            "refunds": "nope"
+        },
+        {},
+        {
+            "transaction": {
+                "value": null,
+                "status": null,
+                "refunded_amount": "abc"
+            }
+        }
+    ],
+    "bank": [
+        {
+            "id": "1",
+            "name": "Bank",
+            "image": "https://a.pl/b.png",
+            "on_from": 0,
+            "on_to": 24,
+            "iterator": 3,
+            "test": false,
+            "type": "pbl"
+        },
+        {
+            "id": 5,
+            "name": 9,
+            "image": 7,
+            "on_from": "8",
+            "on_to": "20.9",
+            "iterator": "2",
+            "test": 1,
+            "type": 5
+        },
+        {
+            "test": "0"
+        },
+        {
+            "test": ""
+        },
+        {
+            "test": "false"
+        },
+        {}
+    ],
+    "refund": [
+        {
+            "status": "success",
+            "refund": true,
+            "message": "ok"
+        },
+        {
+            "status": "success",
+            "refund": "true"
+        },
+        {
+            "status": "error",
+            "refund": false,
+            "message": 42
+        },
+        {
+            "refund": true
+        },
+        {}
+    ],
+    "availability": [
+        {
+            "refund": true,
+            "message": "mozna"
+        },
+        {
+            "refund": false,
+            "message": "nie mozna"
+        },
+        {
+            "refund": "true"
+        },
+        {}
+    ],
+    "payout": [
+        {
+            "id": 7,
+            "state": 1,
+            "net": 100.5,
+            "fee": 2,
+            "gross": "102.50",
+            "creation_date": "2026-07-01",
+            "direct_settlement": 1,
+            "nrb": "PL61",
+            "declined": 0,
+            "decline_reason": "brak",
+            "decline_status": "X",
+            "receiver": {
+                "nrb": "PL61",
+                "title": "t",
+                "amount": 10.0,
+                "service": "s",
+                "receiverName": "Jan",
+                "receiverAddress": "adres"
+            }
+        },
+        {
+            "id": "8",
+            "state": "-1",
+            "declined": "1",
+            "direct_settlement": "0",
+            "receiver": "nope"
+        },
+        {
+            "id": 9,
+            "state": 0,
+            "net": "abc",
+            "receiver": {}
+        },
+        {}
+    ],
+    "blik_alias": [
+        {
+            "alias_value": "a-1",
+            "alias_type": "PAYID",
+            "status": "ACTIVE",
+            "expiration_date": "2027-01-01",
+            "apps": [
+                {
+                    "key": "k",
+                    "label": "l"
+                },
+                "junk",
+                {
+                    "key": 5
+                }
+            ]
+        },
+        {
+            "alias_value": 99,
+            "status": "INACTIVE",
+            "apps": "nope"
+        },
+        {}
+    ],
+    "card_result": [
+        {
+            "success": true,
+            "message": {
+                "redirectType": "SUCCESS"
+            }
+        },
+        {
+            "success": true,
+            "message": {
+                "redirectType": "FORM",
+                "redirectText": "PGZvcm0+"
+            }
+        },
+        {
+            "success": true,
+            "message": {
+                "redirectType": "URL",
+                "redirectText": "aHR0cHM6Ly9hLnBs"
+            }
+        },
+        {
+            "success": true,
+            "message": {
+                "redirectType": "URL",
+                "redirectText": "!!!not-base64"
+            }
+        },
+        {
+            "success": true,
+            "message": {
+                "redirectType": "FORM",
+                "redirectText": ""
+            }
+        },
+        {
+            "success": true,
+            "message": {
+                "redirectType": "DCC_OFFER",
+                "dccOffer": {
+                    "currencyConversionId": "cc-1",
+                    "originalAmount": 29.99,
+                    "originalCurrency": "PLN",
+                    "convertedAmount": 7.05,
+                    "convertedCurrency": "EUR",
+                    "exchangeRate": "4.2543",
+                    "validUntil": "2026-07-22T12:00:00Z",
+                    "declarationText": "Akceptuje",
+                    "europeanEconomicArea": true,
+                    "markup": [
+                        {
+                            "rate": 0.03,
+                            "additionalInfo": "marza"
+                        },
+                        {
+                            "rate": "bad"
+                        },
+                        "junk"
+                    ]
+                }
+            }
+        },
+        {
+            "success": true,
+            "message": {
+                "redirectType": "DCC_OFFER",
+                "dccOffer": {
+                    "originalCurrency": 5,
+                    "convertedCurrency": "xyz",
+                    "originalAmount": "abc",
+                    "exchangeRate": "nope"
+                }
+            }
+        },
+        {
+            "success": true,
+            "message": "not-an-object"
+        },
+        {
+            "success": true
+        }
+    ],
+    "recurring_status": [
+        {
+            "alias": "SUB-1",
+            "method": "blik",
+            "status": "ACTIVE",
+            "expiration_date": "2027-01-01",
+            "registration": {
+                "transaction_id": "tx-2",
+                "label": "Subskrypcja",
+                "model": "M",
+                "frequency": "12M",
+                "limit_amt": 100000,
+                "tot_limit_amt": 500000,
+                "is_limit_amt_fixed": true,
+                "init_date": "2026-08-01",
+                "terms_url": "https://shop.test/regulamin",
+                "terms_version": "2026-09",
+                "registered_at": "2026-07-01T12:00:00+02:00"
+            }
+        },
+        {
+            "alias": "SUB-2",
+            "status": "UNREGISTERED",
+            "registration": {
+                "limit_amt": "100",
+                "tot_limit_amt": "1.5",
+                "is_limit_amt_fixed": "true"
+            }
+        },
+        {
+            "registration": "nope",
+            "status": 7
+        },
+        {}
+    ],
+    "recurring_retry": [
+        {
+            "transactionId": "tx-4",
+            "retry": {
+                "status": "pending",
+                "count": 1
+            }
+        },
+        {
+            "transactionId": "tx-5",
+            "retry": {
+                "status": "failed",
+                "count": 3,
+                "error": "INSUFFICIENT_FUNDS",
+                "error_description": "IssId: 1"
+            }
+        },
+        {
+            "transactionId": 42,
+            "retry": "nope"
+        },
+        {}
+    ],
+    "webhook_event": [
+        {
+            "id": "evt_01k6a8q2m4pz7h8c3v5n9t2x6y",
+            "type": "payment.succeeded",
+            "api_version": "2026-10-01",
+            "created": "2026-09-27T10:05:00Z",
+            "livemode": true,
+            "service": "test_service",
+            "data": {
+                "object": {
+                    "object": "payment",
+                    "id": "tx-1",
+                    "amount": 2999,
+                    "currency": "PLN"
+                }
+            }
+        },
+        {
+            "id": "evt_01k6a8q2m4pz7h8c3v5n9t2x6a",
+            "type": "recurring_payment.canceled",
+            "created": "2026-09-27T10:06:00Z",
+            "livemode": false,
+            "service": null,
+            "merchant_ref": "m-7",
+            "data": {
+                "object": {
+                    "object": "recurring_payment",
+                    "alias": "SUB-1",
+                    "canceled_by": "merchant"
+                }
+            }
+        },
+        {
+            "id": 5,
+            "data": {
+                "object": "nope"
+            }
+        },
+        {}
+    ]
 }

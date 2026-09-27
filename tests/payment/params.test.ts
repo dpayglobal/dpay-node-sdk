@@ -32,6 +32,22 @@ describe('enums', () => {
     expect(() => assertTransactionType('nope')).toThrow('Invalid transaction type "nope"')
     expect(() => assertTransactionType('nope')).toThrow(DPayValueError)
   })
+
+  it('lists the five transaction types the API accepts', () => {
+    expect(Object.values(TransactionType)).toEqual([
+      'transfers',
+      'dcb_gateway',
+      'card_auth',
+      'mb_way_direct',
+      'card_recurring',
+    ])
+  })
+
+  it('rejects the removed types (blik_recurring: recurringRegistration; bizum_direct: not supported)', () => {
+    for (const removed of ['blik_recurring', 'bizum_direct']) {
+      expect(() => assertTransactionType(removed)).toThrow(`Invalid transaction type "${removed}"`)
+    }
+  })
 })
 
 describe('serializeDeviceInfo', () => {

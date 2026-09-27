@@ -4,6 +4,7 @@ import { Money } from '../../src/money.js'
 import type { DeviceInfoParams } from '../../src/payment/params.js'
 import { buildRegisterBody } from '../../src/payment/register-body.js'
 import type { RegisterPaymentParams } from '../../src/payment/register-body.js'
+import { WebhookTarget } from '../../src/webhook/target.js'
 
 const urls = {
   success: 'https://shop.test/ok',
@@ -38,6 +39,21 @@ describe('buildRegisterBody', () => {
       'url_ipn',
     ])
     expect(body.value).toBe('29.99')
+  })
+
+  it('leaves url_ipn out when there is no IPN URL', () => {
+    for (const ipn of [undefined, null]) {
+      const body = buildRegisterBody('s', {
+        ...minimal,
+        urls: { success: urls.success, fail: urls.fail, ipn },
+      })
+      expect(Object.keys(body)).toEqual(['service', 'value', 'transactionType', 'url_success', 'url_fail'])
+    }
+    const withoutKey = buildRegisterBody('s', {
+      ...minimal,
+      urls: { success: urls.success, fail: urls.fail },
+    })
+    expect(withoutKey).not.toHaveProperty('url_ipn')
   })
 
   it('flattens the payer into three separate fields', () => {
@@ -136,29 +152,61 @@ describe('buildRegisterBody', () => {
     ])
   })
 
-  it('places the BLIK and card recurring fields at their wire positions', () => {
+  it('places the recurring registration, webhook and reference at their wire positions', () => {
     const body = buildRegisterBody('s', {
       ...minimal,
-      transactionType: 'blik_recurring',
       partnerPlatform: 'SHOP01',
       blikCode: '123456',
       userAgent: 'UA/1.0',
       userIp: '10.0.0.1',
-      registerBlikRecurringAlias: { label: 'Sub', model: 'M', frequency: '12M' },
+      recurringRegistration: { label: 'Sub', model: 'O', termsUrl: 'https://shop.test/terms' },
       aliasIpnUrl: 'https://shop.test/alias-ipn',
-      registerCardRecurring: { label: 'Mandat' },
       authorizeOnly: true,
+      efaktura: true,
+      webhook: WebhookTarget.create('https://shop.test/webhooks'),
+      reference: 'order-1',
     })
     expect(Object.keys(body).slice(6)).toEqual([
       'partner_platform',
       'user_agent',
       'user_ip',
       'blik_code',
-      'register_blik_recurring_alias',
+      'recurring_registration',
       'alias_ipn_url',
-      'register_card_recurring',
       'authorize_only',
+      'efaktura',
+      'webhook',
+      'reference',
     ])
+  })
+
+  it('places recurring_alias right after the client context and before alias_ipn_url', () => {
+    const body = buildRegisterBody('s', {
+      ...minimal,
+      userAgent: 'UA/1.0',
+      userIp: '10.0.0.1',
+      recurringAlias: 'SUB-1',
+      aliasIpnUrl: 'https://shop.test/alias-ipn',
+      noDelay: true,
+    })
+    expect(Object.keys(body).slice(6)).toEqual([
+      'user_agent',
+      'user_ip',
+      'recurring_alias',
+      'alias_ipn_url',
+      'no_delay',
+    ])
+  })
+
+  it('places the card recurring fields at their wire positions', () => {
+    const body = buildRegisterBody('s', {
+      ...minimal,
+      transactionType: 'card_recurring',
+      aliasIpnUrl: 'https://shop.test/alias-ipn',
+      registerCardRecurring: { label: 'Mandat' },
+      authorizeOnly: true,
+    })
+    expect(Object.keys(body).slice(6)).toEqual(['alias_ipn_url', 'register_card_recurring', 'authorize_only'])
   })
 
   it('validates the mandatory fields', () => {
@@ -192,7 +240,7 @@ describe('buildRegisterBody', () => {
         userIp: 'i',
         registerBlikAlias: { label: 'l' },
       } as RegisterPaymentParams),
-    ).toThrow('blik_alias cannot be combined with blik_code or alias registration')
+    ).toThrow('blik_alias cannot be combined with blik_code, alias registration or recurring payments')
 
     expect(() =>
       buildRegisterBody('s', { ...minimal, registerCardRecurring: { label: 'a' }, cardRecurringAlias: 'x' }),
@@ -274,25 +322,22 @@ describe('buildRegisterBody', () => {
     expect(keys.slice(userIpIndex, noDelayIndex + 1)).toEqual(['user_ip', 'blik_alias', 'no_delay'])
   })
 
-  it('places register_blik_alias at its wire position between blik_code and register_blik_recurring_alias', () => {
+  it('places register_blik_alias at its wire position between blik_code and alias_ipn_url', () => {
     const body = buildRegisterBody('s', {
       ...minimal,
       userAgent: 'Mozilla/5.0',
       userIp: '192.168.1.1',
       blikCode: '123456',
       registerBlikAlias: { label: 'Alias One' },
-      registerBlikRecurringAlias: { label: 'Recurring', model: 'M', frequency: '12M' },
+      aliasIpnUrl: 'https://shop.test/alias-ipn',
     })
     const keys = Object.keys(body)
     const blikCodeIndex = keys.indexOf('blik_code')
-    const registerBlikAliasIndex = keys.indexOf('register_blik_alias')
-    const registerBlikRecurringIndex = keys.indexOf('register_blik_recurring_alias')
-    expect(registerBlikAliasIndex).toBeGreaterThan(blikCodeIndex)
-    expect(registerBlikAliasIndex).toBeLessThan(registerBlikRecurringIndex)
-    expect(keys.slice(blikCodeIndex, registerBlikRecurringIndex + 1)).toEqual([
+    const aliasIpnIndex = keys.indexOf('alias_ipn_url')
+    expect(keys.slice(blikCodeIndex, aliasIpnIndex + 1)).toEqual([
       'blik_code',
       'register_blik_alias',
-      'register_blik_recurring_alias',
+      'alias_ipn_url',
     ])
   })
 

@@ -48,6 +48,12 @@ describe('error hierarchy', () => {
   it('defaults fieldErrors to an empty object', () => {
     expect(new ApiError('nope', 500).fieldErrors).toEqual({})
     expect(new ApiError('nope', 500).errorCode).toBeNull()
+    expect(new ApiError('nope', 500).reason).toBeNull()
+  })
+
+  it('carries the reason next to the code', () => {
+    const error = new ApiError('Invalid webhook URL', 400, 'WEBHOOK_URL_INVALID', {}, '', 'own_domain')
+    expect(error.reason).toBe('own_domain')
   })
 
   it('reads rate limit metadata', () => {
@@ -77,6 +83,20 @@ describe('PaymentRejectedError.fromApi', () => {
     expect(error.message).toBe('Payment rejected')
     expect(error.errorCode).toBeNull()
     expect(error.transactionId).toBeNull()
+    expect(error.errorDescription).toBeNull()
+  })
+
+  it('reads the provider description of the decline', () => {
+    const error = PaymentRejectedError.fromApi({
+      error: true,
+      msg: 'Transaction canceled',
+      status: false,
+      additionalInfo: { error: 'INSUFFICIENT_FUNDS', error_description: 'IssId: 1' },
+    })
+    expect(error.errorDescription).toBe('IssId: 1')
+    expect(
+      PaymentRejectedError.fromApi({ additionalInfo: { error_description: 5 } }).errorDescription,
+    ).toBeNull()
   })
 
   it('stringifies a scalar transaction id', () => {

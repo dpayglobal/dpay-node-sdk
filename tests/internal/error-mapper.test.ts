@@ -41,6 +41,46 @@ describe('mapError', () => {
     expect(mapError(json(403, { errorcode: 7 })).errorCode).toBeNull()
   })
 
+  it('prefers code over errorcode and reads the reason', () => {
+    expect(mapError(json(400, { code: 'NEW', errorcode: 'old' })).errorCode).toBe('NEW')
+    expect(mapError(json(400, { code: 7, errorcode: 'old' })).errorCode).toBe('old')
+    expect(mapError(json(400, { reason: 42 })).reason).toBeNull()
+    expect(mapError(json(400, {})).reason).toBeNull()
+  })
+
+  it('maps the code and reason of cards and webhook errors', () => {
+    const error = mapError(
+      json(400, {
+        success: false,
+        status: 'error',
+        code: 'WEBHOOK_URL_INVALID',
+        reason: 'https_required',
+        message: 'Invalid webhook URL: https_required',
+      }),
+    )
+    expect(error).toBeInstanceOf(InvalidRequestError)
+    expect(error.errorCode).toBe('WEBHOOK_URL_INVALID')
+    expect(error.reason).toBe('https_required')
+    expect(error.message).toBe('Invalid webhook URL: https_required')
+  })
+
+  it('maps a missing checksum to an authentication error', () => {
+    const error = mapError(
+      json(401, {
+        success: false,
+        status: 'error',
+        code: 'CHECKSUM_REQUIRED',
+        message: 'Missing service or checksum',
+      }),
+    )
+    expect(error).toBeInstanceOf(AuthenticationError)
+    expect(error.errorCode).toBe('CHECKSUM_REQUIRED')
+  })
+
+  it('accepts an empty errors list, the way the API encodes an empty map', () => {
+    expect(mapError(json(400, { status: 'failed', message: 'x', errors: [] })).fieldErrors).toEqual({})
+  })
+
   it('normalizes both field error formats into arrays', () => {
     expect(mapError(json(400, { errors: { value: 'is required' } })).fieldErrors).toEqual({
       value: ['is required'],

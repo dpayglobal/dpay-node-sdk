@@ -41,27 +41,45 @@ export type { RegisterPaymentParams } from './payment/register-body.js'
 export type { RegisteredPayment, Transaction, TransactionRefund } from './payment/models.js'
 
 export type { Refund, RefundAvailability } from './refund/models.js'
-export type { RefundParams } from './refund/ops.js'
+export type { CreateRefundParams, RefundParams } from './refund/ops.js'
 
 export type { Bank } from './bank/models.js'
 export type { PayoutDetails, PayoutReceiver } from './payout/models.js'
 export type { PayoutDetailsParams } from './payout/ops.js'
 
 export { BlikAliasType } from './blik/enums.js'
-export type { BlikAliasRegistrationParams, BlikRecurringRegistrationParams } from './blik/params.js'
+export type { BlikAliasRegistrationParams } from './blik/params.js'
 export type { BlikAliasParams, BlikUnregisterAliasParams } from './blik/ops.js'
-export type {
-  BlikAlias,
-  BlikApp,
-  BlikRecurringRegistrationInfo,
-  BlikRecurringStatus,
-} from './blik/models.js'
+export type { BlikAlias, BlikApp } from './blik/models.js'
+
+export {
+  RecurringAliasStatus,
+  RecurringMethod,
+  RecurringModel,
+  RecurringRetryStatus,
+} from './recurring/enums.js'
+export type { RecurringRegistrationParams } from './recurring/params.js'
+export type { RecurringCancelParams } from './recurring/ops.js'
+export type { RecurringRegistrationInfo, RecurringRetryResult, RecurringStatus } from './recurring/models.js'
+
+export { WebhookEventType } from './webhook/event-type.js'
+export { WebhookTarget } from './webhook/target.js'
+export { WebhookVerifier } from './webhook/verifier.js'
+export type { WebhookHeaders, WebhookSecrets, WebhookVerifyOptions } from './webhook/verifier.js'
+export type { EventPage, WebhookEvent } from './webhook/event.js'
+export type { EventFilters, ListEventsParams } from './webhook/ops.js'
 
 export { CardRecurringFrequency, CardRecurringOperation, DccDecision, RedirectType } from './card/enums.js'
 export { CardData } from './card/card-data.js'
 export { CardEncryptor } from './card/encryptor.js'
 export type { CardRecurringRegistrationParams } from './card/recurring-params.js'
-export type { ApplePayParams, CardPaymentParams, GooglePayParams } from './card/params.js'
+export type {
+  ApplePayParams,
+  CardCancelParams,
+  CardCaptureParams,
+  CardPaymentParams,
+  GooglePayParams,
+} from './card/params.js'
 export type { CardPaymentResult, DccMarkup, DccOffer } from './card/models.js'
 
 export { IPN_ACK, IpnType } from './ipn/event.js'

@@ -1,7 +1,10 @@
 import { DPayValueError } from '../errors.js'
 
-/** BLIK alias namespace. */
-export const BlikAliasType = { UID: 'UID', PAYID: 'PAYID' } as const
+/**
+ * BLIK alias namespace. BLIK OneClick aliases are `UID` only; recurring payments (PAYID) are handled by
+ * `dpay.recurring`.
+ */
+export const BlikAliasType = { UID: 'UID' } as const
 
 export type BlikAliasType = (typeof BlikAliasType)[keyof typeof BlikAliasType]
 

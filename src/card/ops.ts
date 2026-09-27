@@ -1,10 +1,18 @@
-import { CardPaymentError } from '../errors.js'
+import { CardPaymentError, DPayValueError } from '../errors.js'
 import type { ApiResponse } from '../http/types.js'
 import { API_PAYMENTS } from '../internal/base-urls.js'
+import type { ChecksumCalculator } from '../internal/checksum.js'
 import { type Operation, decodeRecordOrFail } from '../internal/operation.js'
-import type { Money } from '../money.js'
+import { WebhookEventType } from '../webhook/event-type.js'
+import { serializeWebhookTarget } from '../webhook/target.js'
 import { type CardPaymentResult, parseCardPaymentResult } from './models.js'
-import type { ApplePayParams, CardPaymentParams, GooglePayParams } from './params.js'
+import type {
+  ApplePayParams,
+  CardCancelParams,
+  CardCaptureParams,
+  CardPaymentParams,
+  GooglePayParams,
+} from './params.js'
 import { serializeApplePay, serializeCardPayment, serializeGooglePay } from './params.js'
 
 export function publicKeyOperation(): Operation<string> {
@@ -44,12 +52,41 @@ export function preAuthOperation(id: string, params: CardPaymentParams): Operati
   return paymentOperation(id, '/pay/card-pre-auth', serializeCardPayment(params))
 }
 
-export function captureOperation(id: string, amount?: Money): Operation<CardPaymentResult> {
-  return paymentOperation(id, '/capture', amountBody(amount))
+/**
+ * `{service, amount, webhook?, checksum}`, signed with sha256(capture|service|transaction_id|amount|hash) -
+ * the amount with two decimal places, the webhook object outside the checksum.
+ */
+export function captureOperation(
+  service: string,
+  checksum: ChecksumCalculator,
+  id: string,
+  params: CardCaptureParams,
+): Operation<CardPaymentResult> {
+  if (params?.amount === undefined) throw new DPayValueError('A capture requires an amount')
+  const amount = params.amount.toDecimal()
+  const body: Record<string, unknown> = { service, amount: Number(amount) }
+  if (params.webhook !== undefined) {
+    body.webhook = serializeWebhookTarget(params.webhook, WebhookEventType.CAPTURE, 'a card capture')
+  }
+  body.checksum = checksum.operation('capture', service, id, amount)
+  return paymentOperation(id, '/capture', body)
 }
 
-export function cancelOperation(id: string, amount?: Money): Operation<CardPaymentResult> {
-  return paymentOperation(id, '/cancellation', amountBody(amount))
+/**
+ * `{service, amount?, checksum}`, signed with sha256(cancellation|service|transaction_id|amount|hash) - an empty
+ * amount segment without an amount.
+ */
+export function cancelOperation(
+  service: string,
+  checksum: ChecksumCalculator,
+  id: string,
+  params: CardCancelParams,
+): Operation<CardPaymentResult> {
+  const amount = params.amount === undefined ? null : params.amount.toDecimal()
+  const body: Record<string, unknown> = { service }
+  if (amount !== null) body.amount = Number(amount)
+  body.checksum = checksum.operation('cancellation', service, id, amount)
+  return paymentOperation(id, '/cancellation', body)
 }
 
 export function googlePayOperation(id: string, params: GooglePayParams): Operation<CardPaymentResult> {
@@ -58,8 +95,4 @@ export function googlePayOperation(id: string, params: GooglePayParams): Operati
 
 export function applePayOperation(id: string, params: ApplePayParams): Operation<CardPaymentResult> {
   return paymentOperation(id, '/pay/apple-pay', serializeApplePay(params))
-}
-
-function amountBody(amount?: Money): Record<string, unknown> {
-  return amount === undefined ? {} : { amount: Number(amount.toDecimal()) }
 }
