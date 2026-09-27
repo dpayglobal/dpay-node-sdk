@@ -4,15 +4,11 @@ import type { ChecksumCalculator } from '../internal/checksum.js'
 import { type Operation, decodeRecordOrFail } from '../internal/operation.js'
 import { record } from '../payment/models.js'
 import { type BlikAliasType, assertBlikAliasType } from './enums.js'
-import {
-  type BlikAlias,
-  type BlikRecurringStatus,
-  parseBlikAlias,
-  parseBlikRecurringStatus,
-} from './models.js'
+import { type BlikAlias, parseBlikAlias } from './models.js'
 
 export interface BlikAliasParams {
   aliasValue: string
+  /** Defaults to `UID`, the only type the API accepts. */
   aliasType?: BlikAliasType | (string & {})
 }
 
@@ -62,21 +58,5 @@ export function unregisterAliasOperation(
     parse: (response) => {
       decodeRecordOrFail(response)
     },
-  }
-}
-
-export function recurringStatusOperation(
-  service: string,
-  checksum: ChecksumCalculator,
-  params: { aliasValue: string },
-): Operation<BlikRecurringStatus> {
-  const body: Record<string, unknown> = { service, alias_value: params.aliasValue }
-  body.checksum = checksum.secretSecond(service, [params.aliasValue])
-  return {
-    method: 'POST',
-    host: API_PAYMENTS,
-    path: '/api/v1_0/payments/blik/recurring/status',
-    body,
-    parse: (response) => parseBlikRecurringStatus(envelope(response)),
   }
 }

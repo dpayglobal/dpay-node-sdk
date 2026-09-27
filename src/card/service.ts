@@ -1,6 +1,5 @@
 import type { RequestOptions } from '../config.js'
 import type { ApiRequestor } from '../internal/requestor.js'
-import type { Money } from '../money.js'
 import type { CardPaymentResult } from './models.js'
 import {
   applePayOperation,
@@ -11,7 +10,13 @@ import {
   preAuthOperation,
   publicKeyOperation,
 } from './ops.js'
-import type { ApplePayParams, CardPaymentParams, GooglePayParams } from './params.js'
+import type {
+  ApplePayParams,
+  CardCancelParams,
+  CardCaptureParams,
+  CardPaymentParams,
+  GooglePayParams,
+} from './params.js'
 
 /** Charges, authorizes, captures and cancels card payments, including Google Pay and Apple Pay wallets. */
 export class CardService {
@@ -44,22 +49,34 @@ export class CardService {
     return this.api.execute(preAuthOperation(transactionId, params), options)
   }
 
-  /** Captures a pre-authorization. Omit `amount` to capture in full. */
+  /**
+   * Captures a pre-authorized amount (partial captures allowed up to the authorization). Signed with
+   * sha256(capture|service|transaction_id|amount|hash); the optional webhook receives `payment.captured`.
+   */
   async capture(
     transactionId: string,
-    params?: { amount?: Money },
+    params: CardCaptureParams,
     options?: RequestOptions,
   ): Promise<CardPaymentResult> {
-    return this.api.execute(captureOperation(transactionId, params?.amount), options)
+    return this.api.execute(
+      captureOperation(this.api.service, this.api.checksum, transactionId, params),
+      options,
+    )
   }
 
-  /** Cancels a pre-authorization. Omit `amount` to cancel in full. */
+  /**
+   * Cancels a pre-authorization; omit `amount` to cancel the whole uncaptured remainder. Signed with
+   * sha256(cancellation|service|transaction_id|amount|hash).
+   */
   async cancel(
     transactionId: string,
-    params?: { amount?: Money },
+    params: CardCancelParams = {},
     options?: RequestOptions,
   ): Promise<CardPaymentResult> {
-    return this.api.execute(cancelOperation(transactionId, params?.amount), options)
+    return this.api.execute(
+      cancelOperation(this.api.service, this.api.checksum, transactionId, params),
+      options,
+    )
   }
 
   /** Pays with a Google Pay token. */

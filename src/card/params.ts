@@ -1,6 +1,22 @@
+import type { Money } from '../money.js'
 import type { DeviceInfoParams } from '../payment/params.js'
 import { serializeDeviceInfo } from '../payment/params.js'
+import type { WebhookTarget } from '../webhook/target.js'
 import { type DccDecision, assertDccDecision } from './enums.js'
+
+/** Capture of a pre-authorization. */
+export interface CardCaptureParams {
+  /** Amount to capture; partial captures are allowed up to the authorization. */
+  amount: Money
+  /** Sends the `payment.captured` event of this capture to this URL. Not part of the checksum. */
+  webhook?: WebhookTarget
+}
+
+/** Cancellation of a pre-authorization. */
+export interface CardCancelParams {
+  /** Amount to release; without it the whole uncaptured remainder is cancelled. */
+  amount?: Money
+}
 
 /** Server-to-server card payment. */
 export interface CardPaymentParams {

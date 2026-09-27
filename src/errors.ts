@@ -37,7 +37,10 @@ export class TransportError extends DPayError {
   override readonly type = 'transport_error'
 }
 
-/** The IPN payload is malformed or its signature does not match. */
+/**
+ * The IPN or webhook payload is malformed, its signature does not match, or (webhooks) its timestamp is
+ * outside the tolerance.
+ */
 export class SignatureVerificationError extends DPayError {
   override readonly type = 'signature_verification_error'
 }
@@ -52,12 +55,17 @@ export class ApiError extends DPayError {
   override readonly type: DPayErrorType = 'api_error'
   /** HTTP status of the response, or 200 for rejections carried in a success body. */
   readonly httpStatus: number
-  /** Business error code from the API, when present. */
+  /**
+   * Business error code from the API, when present: the `code` field (for example `CHECKSUM_REQUIRED`,
+   * `INVALID_CHECKSUM`, `WEBHOOK_URL_INVALID`), otherwise the older `errorcode`.
+   */
   readonly errorCode: string | null
   /** Per-field validation messages, normalized across the 400 and 422 formats. */
   readonly fieldErrors: Record<string, string[]>
   /** Unparsed response body. */
   readonly rawBody: string
+  /** Detailed reason next to the code, for example `https_required` for `WEBHOOK_URL_INVALID`. */
+  readonly reason: string | null
 
   constructor(
     message: string,
@@ -65,12 +73,14 @@ export class ApiError extends DPayError {
     errorCode: string | null = null,
     fieldErrors: Record<string, string[]> = {},
     rawBody = '',
+    reason: string | null = null,
   ) {
     super(message)
     this.httpStatus = httpStatus
     this.errorCode = errorCode
     this.fieldErrors = fieldErrors
     this.rawBody = rawBody
+    this.reason = reason
   }
 }
 
@@ -129,6 +139,8 @@ export class PaymentRejectedError extends ApiError {
   override readonly type = 'payment_rejected_error'
   /** Transaction identifier returned alongside the rejection, when present. */
   readonly transactionId: string | null
+  /** Provider's description of the decline (`additionalInfo.error_description`), when it sent one. */
+  readonly errorDescription: string | null
 
   constructor(
     message: string,
@@ -137,9 +149,11 @@ export class PaymentRejectedError extends ApiError {
     fieldErrors: Record<string, string[]> = {},
     rawBody = '',
     transactionId: string | null = null,
+    errorDescription: string | null = null,
   ) {
     super(message, httpStatus, errorCode, fieldErrors, rawBody)
     this.transactionId = transactionId
+    this.errorDescription = errorDescription
   }
 
   static fromApi(data: Record<string, unknown>): PaymentRejectedError {
@@ -147,7 +161,17 @@ export class PaymentRejectedError extends ApiError {
     const additional = isRecord(data.additionalInfo) ? data.additionalInfo : {}
     const errorCode = typeof additional.error === 'string' ? additional.error : null
     const transactionId = isScalar(data.transactionId) ? phpStrval(data.transactionId) : null
-    return new PaymentRejectedError(message, 200, errorCode, {}, phpJsonEncode(data), transactionId)
+    const errorDescription =
+      typeof additional.error_description === 'string' ? additional.error_description : null
+    return new PaymentRejectedError(
+      message,
+      200,
+      errorCode,
+      {},
+      phpJsonEncode(data),
+      transactionId,
+      errorDescription,
+    )
   }
 }
 

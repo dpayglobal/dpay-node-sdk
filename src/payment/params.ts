@@ -9,8 +9,11 @@ export interface ReturnUrls {
   success: string
   /** Payer returns here after a failed payment. */
   fail: string
-  /** dpay posts the IPN here. Must be reachable from the internet. */
-  ipn: string
+  /**
+   * dpay posts the IPN here. Must be reachable from the internet. Optional: without it `url_ipn` is not
+   * sent and no IPN arrives - the outcome comes as a webhook event.
+   */
+  ipn?: string | null | undefined
 }
 
 /** Optional payer identity, prefilled on the payment page. */

@@ -13,9 +13,15 @@ const GOLDEN_LEAVES = leaves(GOLDEN, { skipPathsContaining: 'User-Agent' })
 const ACTUAL_LEAVES = leaves(ACTUAL, { skipPathsContaining: 'User-Agent' })
 
 describe('parity with the PHP SDK', () => {
-  it('covers all 23 recorded calls', () => {
-    expect((GOLDEN.calls as unknown[]).length).toBe(23)
-    expect((ACTUAL.calls as unknown[]).length).toBe(23)
+  it('covers all 29 recorded calls', () => {
+    expect((GOLDEN.calls as unknown[]).length).toBe(29)
+    expect((ACTUAL.calls as unknown[]).length).toBe(29)
+  })
+
+  it('sends every request body byte for byte like the PHP SDK', () => {
+    const bodies = (payload: Record<string, unknown>): unknown[] =>
+      (payload.calls as Array<{ body: unknown }>).map((call) => call.body)
+    expect(bodies(ACTUAL)).toEqual(bodies(GOLDEN))
   })
 
   it('produces exactly the same set of leaves', () => {

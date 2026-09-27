@@ -57,6 +57,23 @@ function stripTrailingZeros(text: string): string {
   return text.replace(/\.?0+$/, '')
 }
 
+/** PHP `strlen`: length in UTF-8 bytes. */
+export function phpStrlen(text: string): number {
+  return Buffer.byteLength(text, 'utf8')
+}
+
+/** PHP `mb_strlen` on a UTF-8 string: length in code points. */
+export function phpMbStrlen(text: string): number {
+  return [...text].length
+}
+
+const PHP_TRIM = /^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g
+
+/** PHP `trim` with the default character list: space, tab, newlines, NUL and vertical tab only. */
+export function phpTrim(text: string): string {
+  return text.replace(PHP_TRIM, '')
+}
+
 export function phpRound(value: number): number {
   return value >= 0 ? Math.floor(value + 0.5) : Math.ceil(value - 0.5)
 }

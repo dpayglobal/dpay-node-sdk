@@ -4,9 +4,20 @@ import { DPayClient } from '../src/index.js'
 import { MockHttpClient } from '../src/testing.js'
 
 describe('DPayClient', () => {
-  it('mounts all seven services', () => {
+  it('mounts all nine services', () => {
     const dpay = new DPayClient({ service: 's', secretHash: 'h' })
-    for (const name of ['payments', 'refunds', 'banks', 'blik', 'cards', 'payouts', 'ipn'] as const) {
+    const services = [
+      'payments',
+      'refunds',
+      'banks',
+      'blik',
+      'cards',
+      'payouts',
+      'recurring',
+      'events',
+      'ipn',
+    ] as const
+    for (const name of services) {
       expect(dpay[name]).toBeDefined()
     }
   })
@@ -55,6 +66,13 @@ describe('public surface', () => {
       'DccDecision',
       'CardRecurringOperation',
       'CardRecurringFrequency',
+      'RecurringModel',
+      'RecurringMethod',
+      'RecurringAliasStatus',
+      'RecurringRetryStatus',
+      'WebhookEventType',
+      'WebhookTarget',
+      'WebhookVerifier',
       'IpnType',
       'IPN_ACK',
       'constructIpnEvent',
@@ -82,7 +100,15 @@ describe('public surface', () => {
   })
 
   it('does not leak internals', () => {
-    for (const name of ['ApiRequestor', 'ChecksumCalculator', 'phpStrval', 'Config', 'buildRegisterBody']) {
+    for (const name of [
+      'ApiRequestor',
+      'ChecksumCalculator',
+      'phpStrval',
+      'Config',
+      'buildRegisterBody',
+      'serializeWebhookTarget',
+      'assertEventsAllowed',
+    ]) {
       expect(api, `internal leaked: ${name}`).not.toHaveProperty(name)
     }
   })

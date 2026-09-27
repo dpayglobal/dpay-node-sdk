@@ -21,6 +21,21 @@ describe('parseRegisteredPayment', () => {
     expect(parseRegisteredPayment({ additionalInfo: 'nope' }).cardRecurringAlias).toBeNull()
   })
 
+  it('reads the registered recurring payment, keeping only string methods', () => {
+    const payment = parseRegisteredPayment({
+      msg: 'Internal processing',
+      additionalInfo: { recurring_registration: { alias: 'SUB-1', methods: ['blik', 7, null] } },
+    })
+    expect(payment.recurringAlias).toBe('SUB-1')
+    expect(payment.recurringMethods).toEqual(['blik'])
+    expect(Object.isFrozen(payment.recurringMethods)).toBe(true)
+
+    const none = parseRegisteredPayment({ additionalInfo: { recurring_registration: 'nope' } })
+    expect(none.recurringAlias).toBeNull()
+    expect(none.recurringMethods).toEqual([])
+    expect(parseRegisteredPayment({}).recurringMethods).toEqual([])
+  })
+
   it('coerces scalars and keeps the raw payload', () => {
     const payment = parseRegisteredPayment({ transactionId: 77, msg: null, extra: 1 })
     expect(payment.transactionId).toBe('77')

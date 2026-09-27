@@ -1,7 +1,22 @@
+import { isIP } from 'node:net'
 import { DPayValueError } from '../errors.js'
 
 const EMAIL = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/
 const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+/** IPv4 or IPv6 address, like PHP `FILTER_VALIDATE_IP` (which also rejects IPv6 zone ids such as `%eth0`). */
+export function isValidIp(ip: string): boolean {
+  return isIP(ip) !== 0 && !ip.includes('%')
+}
+
+/** True when the text holds an ASCII control character (U+0000-U+001F or U+007F). */
+export function hasControlCharacters(text: string): boolean {
+  for (const char of text) {
+    const code = char.charCodeAt(0)
+    if (code <= 0x1f || code === 0x7f) return true
+  }
+  return false
+}
 
 export function isValidUrl(url: string): boolean {
   if (url === '') return false

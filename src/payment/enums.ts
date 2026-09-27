@@ -1,13 +1,14 @@
 import { DPayValueError } from '../errors.js'
 
-/** Payment flow requested at registration time. */
+/**
+ * Payment flow requested at registration time. BLIK recurring payments use `transfers` with
+ * `recurringRegistration` or `recurringAlias`.
+ */
 export const TransactionType = {
   TRANSFERS: 'transfers',
   DCB_GATEWAY: 'dcb_gateway',
   CARD_AUTH: 'card_auth',
   MB_WAY_DIRECT: 'mb_way_direct',
-  BIZUM_DIRECT: 'bizum_direct',
-  BLIK_RECURRING: 'blik_recurring',
   CARD_RECURRING: 'card_recurring',
 } as const
 

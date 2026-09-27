@@ -39,21 +39,28 @@ describe('BlikService.alias', () => {
     expect(alias.apps[0]?.label).toBe('Bank')
   })
 
-  it('computes the checksum from alias_value alone', async () => {
-    const { transport, blik } = build()
+  it('computes the checksum from alias_value alone (shared vector blik_aliases_uid)', async () => {
+    const transport = new MockHttpClient()
+    const config = Config.fromOptions({
+      service: 'sdk-test-service',
+      secretHash: 'sdk-test-hash-0001',
+      httpClient: transport,
+    })
+    const blik = new BlikService(new ApiRequestor(config, transport))
     transport.queueJson(200, { data: {} })
-    await blik.alias({ aliasValue: 'a-1' })
-    const withAlias = transport.lastRequestBody.checksum
-
-    const second = build()
-    second.transport.queueJson(200, { data: {} })
-    await second.blik.alias({ aliasValue: 'a-1', aliasType: 'PAYID' })
-    expect(second.transport.lastRequestBody.checksum).toBe(withAlias)
+    await blik.alias({ aliasValue: 'DPAY.UID.1.abcd1234', aliasType: 'UID' })
+    // sha256(service|hash|alias_value)
+    expect(transport.lastRequestBody.checksum).toBe(
+      'f3ab74b584c29e0a1d66c8037a962e0e52e74e070c092ee2437e2254544703f5',
+    )
   })
 
-  it('validates the alias type', async () => {
+  it('validates the alias type and rejects PAYID', async () => {
     const { blik } = build()
     await expect(blik.alias({ aliasValue: 'a-1', aliasType: 'nope' })).rejects.toBeInstanceOf(DPayValueError)
+    await expect(blik.alias({ aliasValue: 'a-1', aliasType: 'PAYID' })).rejects.toThrow(
+      'Invalid BLIK alias type "PAYID"',
+    )
   })
 })
 
@@ -61,17 +68,18 @@ describe('BlikService.unregisterAlias', () => {
   it('appends reason to the body but not to the checksum', async () => {
     const { transport, blik } = build()
     transport.queueJson(200, { data: {} })
-    await blik.unregisterAlias({ aliasValue: 'a-1', aliasType: 'PAYID', reason: 'user request' })
+    await blik.unregisterAlias({ aliasValue: 'a-1', aliasType: 'UID', reason: 'user request' })
     const withReason = transport.lastRequestBody
 
     expect(transport.lastRequest.url).toBe(
       'https://api-payments.dpay.pl/api/v1_0/payments/blik/aliases/unregister',
     )
     expect(Object.keys(withReason)).toEqual(['service', 'alias_value', 'alias_type', 'reason', 'checksum'])
+    expect(withReason.alias_type).toBe('UID')
 
     const second = build()
     second.transport.queueJson(200, { data: {} })
-    await second.blik.unregisterAlias({ aliasValue: 'a-1', aliasType: 'PAYID' })
+    await second.blik.unregisterAlias({ aliasValue: 'a-1' })
     expect(second.transport.lastRequestBody.checksum).toBe(withReason.checksum)
   })
 
@@ -82,29 +90,9 @@ describe('BlikService.unregisterAlias', () => {
   })
 })
 
-describe('BlikService.recurringStatus', () => {
-  it('reads the registration block', async () => {
-    const { transport, blik } = build()
-    transport.queueJson(200, {
-      data: {
-        alias_value: 'a-1',
-        status: 'ACTIVE',
-        registration: { model: 'M', frequency: '12M', limit_amt: 100000, is_limit_amt_fixed: true },
-      },
-    })
-    const status = await blik.recurringStatus({ aliasValue: 'a-1' })
-
-    expect(Object.keys(transport.lastRequestBody)).toEqual(['service', 'alias_value', 'checksum'])
-    expect(status.isActive).toBe(true)
-    expect(status.aliasType).toBe('PAYID')
-    expect(status.registration?.model).toBe('M')
-    expect(status.registration?.limitAmt).toBe(100000)
-    expect(status.registration?.isLimitAmtFixed).toBe(true)
-  })
-
-  it('leaves registration null when absent', async () => {
-    const { transport, blik } = build()
-    transport.queueJson(200, { data: { alias_value: 'a-1' } })
-    expect((await blik.recurringStatus({ aliasValue: 'a-1' })).registration).toBeNull()
+describe('BlikService recurring status', () => {
+  it('is gone - the status of a recurring payment comes from dpay.recurring.status()', () => {
+    const { blik } = build()
+    expect('recurringStatus' in blik).toBe(false)
   })
 })

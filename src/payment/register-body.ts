@@ -1,13 +1,18 @@
-import type { BlikAliasRegistrationParams, BlikRecurringRegistrationParams } from '../blik/params.js'
-import { serializeBlikAliasRegistration, serializeBlikRecurringRegistration } from '../blik/params.js'
+import type { BlikAliasRegistrationParams } from '../blik/params.js'
+import { serializeBlikAliasRegistration } from '../blik/params.js'
 import { type CardRecurringOperation, assertCardRecurringOperation } from '../card/enums.js'
 import type { CardRecurringRegistrationParams } from '../card/recurring-params.js'
 import { serializeCardRecurringRegistration } from '../card/recurring-params.js'
 import { assertCurrency } from '../currency.js'
 import { DPayValueError } from '../errors.js'
-import { isValidEmail, isValidUrl } from '../internal/validation.js'
+import { phpMbStrlen, phpStrlen, phpTrim } from '../internal/php.js'
+import { hasControlCharacters, isValidEmail, isValidIp, isValidUrl } from '../internal/validation.js'
 import type { Money } from '../money.js'
-import { type TransactionType, assertTransactionType } from './enums.js'
+import type { RecurringRegistrationParams } from '../recurring/params.js'
+import { serializeRecurringRegistration } from '../recurring/params.js'
+import { WebhookEventType } from '../webhook/event-type.js'
+import { type WebhookTarget, serializeWebhookTarget } from '../webhook/target.js'
+import { TransactionType, assertTransactionType } from './enums.js'
 import type {
   DeviceInfoParams,
   InvoiceParams,
@@ -26,7 +31,7 @@ export interface RegisterPaymentParams {
   amount: Money
   /** Payment flow. */
   transactionType: TransactionType | (string & {})
-  /** Success, failure and IPN URLs. */
+  /** Success, failure and (optional) IPN URLs. */
   urls: ReturnUrls
   description?: string
   /** Opaque merchant reference, echoed back in the IPN. */
@@ -47,16 +52,32 @@ export interface RegisterPaymentParams {
   currencyCode?: string
   /** Uppercase letters and digits, up to 64 characters. */
   partnerPlatform?: string
-  /** Required together with `blikCode` or `blikAlias`. */
+  /**
+   * Payer's browser. Required together with `blikCode` or `blikAlias`; optional client context of a recurring
+   * charge (`recurringAlias`).
+   */
   userAgent?: string
-  /** Required together with `blikCode` or `blikAlias`. */
+  /**
+   * Payer's IP address. Required together with `blikCode` or `blikAlias`; optional client context of a recurring
+   * charge (`recurringAlias`), validated as an IPv4 or IPv6 address when given without a BLIK code or alias.
+   */
   userIp?: string
   /** Exactly six digits. Cannot be combined with `blikAlias`. */
   blikCode?: string
-  /** Cannot be combined with `blikCode` or any alias registration. */
+  /** BLIK OneClick alias (`UID`). Cannot be combined with `blikCode`, alias registrations or recurring payments. */
   blikAlias?: string
   registerBlikAlias?: BlikAliasRegistrationParams
-  registerBlikRecurringAlias?: BlikRecurringRegistrationParams
+  /**
+   * Registers a recurring payment together with this payment. Requires the customer's `blikCode` and
+   * `transactionType` `transfers`; the amount may be 0 (consent only) or an initial fee.
+   */
+  recurringRegistration?: RecurringRegistrationParams
+  /**
+   * Charges a registered recurring payment server-to-server (no BLIK code), 1 to 128 characters.
+   * `transactionType` `transfers`, amount above 0. The alias is appended to the checksum, binding the charge
+   * to that customer.
+   */
+  recurringAlias?: string
   aliasIpnUrl?: string
   noDelay?: boolean
   /** Cannot be combined with `cardRecurringAlias`. */
@@ -73,6 +94,16 @@ export interface RegisterPaymentParams {
   /** Only valid when `transactionType` is `transfers`. */
   efaktura?: boolean
   invoice?: InvoiceParams
+  /**
+   * Also sends this payment's events (and later events of its refunds and recurring payment) to this URL,
+   * signed with the service's webhook secret. Payment and recurring payment events only. Not part of the checksum.
+   */
+  webhook?: WebhookTarget
+  /**
+   * Your reference of the payment, 1 to 64 characters after trimming, without control characters; returned as
+   * `references.merchant` in webhooks. Not part of the checksum.
+   */
+  reference?: string
 }
 
 /**
@@ -80,7 +111,7 @@ export interface RegisterPaymentParams {
  *
  * Validates the mandatory fields (transaction type, URLs, payer email when present), enforces the
  * cross-field exclusions and companion-field requirements the PHP SDK enforced through its builder
- * method signatures, and delegates nested-object serialization to the Task 10/11 serializers.
+ * method signatures, and the combinations a recurring payment allows.
  *
  * Nested objects and arrays are copied, not aliased, so mutating the caller's `params` after this
  * call cannot change the returned body.
@@ -90,6 +121,7 @@ export interface RegisterPaymentParams {
 export function buildRegisterBody(service: string, params: RegisterPaymentParams): Record<string, unknown> {
   assertTransactionType(params.transactionType)
   assertExclusions(params)
+  assertRecurringCombination(params)
 
   const body: Record<string, unknown> = {
     service,
@@ -97,7 +129,9 @@ export function buildRegisterBody(service: string, params: RegisterPaymentParams
     transactionType: params.transactionType,
     url_success: assertUrl(params.urls.success, 'success'),
     url_fail: assertUrl(params.urls.fail, 'fail'),
-    url_ipn: assertUrl(params.urls.ipn, 'ipn'),
+  }
+  if (params.urls.ipn !== undefined && params.urls.ipn !== null) {
+    body.url_ipn = assertUrl(params.urls.ipn, 'ipn')
   }
 
   if (params.description !== undefined) body.description = params.description
@@ -144,9 +178,10 @@ export function buildRegisterBody(service: string, params: RegisterPaymentParams
   if (params.registerBlikAlias !== undefined) {
     body.register_blik_alias = serializeBlikAliasRegistration(params.registerBlikAlias)
   }
-  if (params.registerBlikRecurringAlias !== undefined) {
-    body.register_blik_recurring_alias = serializeBlikRecurringRegistration(params.registerBlikRecurringAlias)
+  if (params.recurringRegistration !== undefined) {
+    body.recurring_registration = serializeRecurringRegistration(params.recurringRegistration)
   }
+  if (params.recurringAlias !== undefined) body.recurring_alias = params.recurringAlias
   if (params.aliasIpnUrl !== undefined) {
     if (!isValidUrl(params.aliasIpnUrl)) {
       throw new DPayValueError(`Invalid alias IPN URL "${params.aliasIpnUrl}"`)
@@ -170,6 +205,14 @@ export function buildRegisterBody(service: string, params: RegisterPaymentParams
   if (params.products !== undefined) body.products = params.products.map((product) => ({ ...product }))
   if (params.efaktura !== undefined) body.efaktura = params.efaktura
   if (params.invoice !== undefined) body.invoice = serializeInvoice(params.invoice)
+  if (params.webhook !== undefined) {
+    body.webhook = serializeWebhookTarget(
+      params.webhook,
+      WebhookEventType.PAYMENT_REGISTRATION,
+      'a payment registration',
+    )
+  }
+  if (params.reference !== undefined) body.reference = normalizeReference(params.reference)
 
   return body
 }
@@ -180,9 +223,13 @@ function assertExclusions(params: RegisterPaymentParams): void {
   }
   if (
     params.blikAlias !== undefined &&
-    (params.registerBlikAlias !== undefined || params.registerBlikRecurringAlias !== undefined)
+    (params.registerBlikAlias !== undefined ||
+      params.recurringRegistration !== undefined ||
+      params.recurringAlias !== undefined)
   ) {
-    throw new DPayValueError('blik_alias cannot be combined with blik_code or alias registration')
+    throw new DPayValueError(
+      'blik_alias cannot be combined with blik_code, alias registration or recurring payments',
+    )
   }
   if (params.registerCardRecurring !== undefined && params.cardRecurringAlias !== undefined) {
     throw new DPayValueError('register_card_recurring cannot be combined with card_recurring_alias')
@@ -196,9 +243,63 @@ function assertExclusions(params: RegisterPaymentParams): void {
   ) {
     throw new DPayValueError('blik_code and blik_alias require user_agent and user_ip')
   }
+  // Without a BLIK code or alias the payer's IP is the client context of the payment
+  if (
+    params.userIp !== undefined &&
+    params.blikCode === undefined &&
+    params.blikAlias === undefined &&
+    !isValidIp(params.userIp)
+  ) {
+    throw new DPayValueError(`Invalid user IP "${params.userIp}"`)
+  }
   if (params.phoneNumber !== undefined && params.currencyCode === undefined) {
     throw new DPayValueError('phone_number requires currency_code')
   }
+  if (
+    params.recurringAlias !== undefined &&
+    (params.recurringAlias === '' || phpStrlen(params.recurringAlias) > 128)
+  ) {
+    throw new DPayValueError('Recurring alias must be 1-128 characters')
+  }
+}
+
+/** The fields a recurring registration or charge excludes, and what each of them requires. */
+function assertRecurringCombination(params: RegisterPaymentParams): void {
+  const registration = params.recurringRegistration !== undefined
+  const charge = params.recurringAlias !== undefined
+  if (!registration && !charge) return
+  if (registration && charge) {
+    throw new DPayValueError('recurring_registration cannot be combined with recurring_alias')
+  }
+  if (params.transactionType !== TransactionType.TRANSFERS) {
+    throw new DPayValueError('Recurring payments require transactionType "transfers"')
+  }
+  const conflicts: Array<[string, unknown]> = [
+    ['blik_alias', params.blikAlias],
+    ['register_blik_alias', params.registerBlikAlias],
+    ['register_card_recurring', params.registerCardRecurring],
+    ['card_recurring_alias', params.cardRecurringAlias],
+  ]
+  if (registration) {
+    conflicts.push(['channel', params.channel])
+    if (params.blikCode === undefined) {
+      throw new DPayValueError("recurring_registration requires the customer's BLIK code (blikCode)")
+    }
+  } else {
+    conflicts.push(['blik_code', params.blikCode])
+    if (params.amount.minor <= 0) throw new DPayValueError('A recurring charge requires an amount above 0')
+  }
+  for (const [field, value] of conflicts) {
+    if (value !== undefined) throw new DPayValueError(`${field} cannot be combined with a recurring payment`)
+  }
+}
+
+function normalizeReference(reference: string): string {
+  const trimmed = phpTrim(reference)
+  if (trimmed === '' || phpMbStrlen(trimmed) > 64 || hasControlCharacters(trimmed)) {
+    throw new DPayValueError('Reference must be 1-64 characters without control characters')
+  }
+  return trimmed
 }
 
 function assertUrl(url: string, name: string): string {

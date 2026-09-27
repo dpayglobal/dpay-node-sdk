@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { ChecksumCalculator } from '../../src/internal/checksum.js'
 
 const SERVICE = 'test_service'
 const SECRET = 'sekret-hash-123'
 const checksum = new ChecksumCalculator(SECRET)
+const sha256 = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex')
 
 describe('ChecksumCalculator', () => {
   it('matches the checksums golden vector from the PHP SDK', () => {
@@ -32,5 +34,35 @@ describe('ChecksumCalculator', () => {
 
   it('produces a lowercase hex sha256 digest', () => {
     expect(checksum.orderedBody(['x'])).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('takes the whole body: skips checksum, flattens nested values in order, casts like PHP', () => {
+    const body = {
+      service: SERVICE,
+      checksum: 'stale',
+      value: '15.00',
+      amount: 15.0,
+      flag: true,
+      off: false,
+      none: null,
+      skipped: undefined,
+      webhook: { url: 'https://a.test/w', events: ['refund.succeeded', 'refund.failed'] },
+      empty: [],
+    }
+    expect(checksum.orderedBody(body)).toBe(
+      sha256(`${SERVICE}|15.00|15|1|||https://a.test/w|refund.succeeded|refund.failed|${SECRET}`),
+    )
+    expect(checksum.orderedBody({ service: SERVICE, transaction_id: 'tx-1' })).toBe(
+      checksum.orderedBody([SERVICE, 'tx-1']),
+    )
+  })
+
+  it('signs card operations with the hash at the end and an empty segment without an amount', () => {
+    expect(checksum.operation('capture', SERVICE, 'tx-1', '29.99')).toBe(
+      sha256(`capture|${SERVICE}|tx-1|29.99|${SECRET}`),
+    )
+    expect(checksum.operation('cancellation', SERVICE, 'tx-1', null)).toBe(
+      sha256(`cancellation|${SERVICE}|tx-1||${SECRET}`),
+    )
   })
 })

@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { parseBank } from '../../src/bank/models.js'
-import { parseBlikAlias, parseBlikRecurringStatus } from '../../src/blik/models.js'
+import { parseBlikAlias } from '../../src/blik/models.js'
 import { parseCardPaymentResult } from '../../src/card/models.js'
 import type { Money } from '../../src/money.js'
 import { parseRegisteredPayment, parseTransaction } from '../../src/payment/models.js'
 import { parsePayoutDetails } from '../../src/payout/models.js'
+import { parseRecurringRetryResult, parseRecurringStatus } from '../../src/recurring/models.js'
 import { parseRefund, parseRefundAvailability } from '../../src/refund/models.js'
+import { parseWebhookEvent } from '../../src/webhook/event.js'
 
 interface Fixtures {
   registered: Array<Record<string, unknown>>
@@ -15,8 +17,10 @@ interface Fixtures {
   availability: Array<Record<string, unknown>>
   payout: Array<Record<string, unknown>>
   blik_alias: Array<Record<string, unknown>>
-  blik_recurring: Array<Record<string, unknown>>
   card_result: Array<Record<string, unknown>>
+  recurring_status: Array<Record<string, unknown>>
+  recurring_retry: Array<Record<string, unknown>>
+  webhook_event: Array<Record<string, unknown>>
 }
 
 const FIXTURES = JSON.parse(
@@ -52,6 +56,8 @@ export function runResponseScenario(): Record<string, unknown> {
         is_internal_processing: model.isInternalProcessing,
         card_recurring_alias: model.cardRecurringAlias,
         ipksef: model.ipksef,
+        recurring_alias: model.recurringAlias,
+        recurring_methods: model.recurringMethods,
       }
     }),
 
@@ -158,12 +164,12 @@ export function runResponseScenario(): Record<string, unknown> {
       }
     }),
 
-    blik_recurring: FIXTURES.blik_recurring.map((fixture) => {
-      const model = parseBlikRecurringStatus(fixture)
+    recurring_status: FIXTURES.recurring_status.map((fixture) => {
+      const model = parseRecurringStatus(fixture)
       const registration = model.registration
       return {
-        alias_value: model.aliasValue,
-        alias_type: model.aliasType,
+        alias: model.alias,
+        method: model.method,
         status: model.status,
         is_active: model.isActive,
         expiration_date: model.expirationDate,
@@ -171,15 +177,46 @@ export function runResponseScenario(): Record<string, unknown> {
           registration === null
             ? null
             : {
+                transaction_id: registration.transactionId,
+                label: registration.label,
                 model: registration.model,
                 frequency: registration.frequency,
                 limit_amt: registration.limitAmt,
                 tot_limit_amt: registration.totLimitAmt,
                 is_limit_amt_fixed: registration.isLimitAmtFixed,
                 init_date: registration.initDate,
-                label: registration.label,
+                terms_url: registration.termsUrl,
+                terms_version: registration.termsVersion,
                 registered_at: registration.registeredAt,
               },
+      }
+    }),
+
+    recurring_retry: FIXTURES.recurring_retry.map((fixture) => {
+      const model = parseRecurringRetryResult(fixture)
+      return {
+        transaction_id: model.transactionId,
+        status: model.status,
+        is_pending: model.isPending,
+        is_failed: model.isFailed,
+        count: model.count,
+        error_code: model.errorCode,
+        error_description: model.errorDescription,
+      }
+    }),
+
+    webhook_event: FIXTURES.webhook_event.map((fixture) => {
+      const model = parseWebhookEvent(fixture)
+      return {
+        id: model.id,
+        type: model.type,
+        api_version: model.apiVersion,
+        created: model.created,
+        livemode: model.livemode,
+        service: model.service,
+        merchant_ref: model.merchantRef,
+        object_type: model.objectType,
+        object: model.object,
       }
     }),
 

@@ -18,12 +18,18 @@ export function registerOperation(
   params: RegisterPaymentParams,
 ): Operation<RegisteredPayment> {
   const body = buildRegisterBody(service, params)
-  body.checksum = checksum.secretSecond(service, [
+  // Without an IPN URL its segment stays empty
+  const fields = [
     stringField(body, 'value'),
     stringField(body, 'url_success'),
     stringField(body, 'url_fail'),
     stringField(body, 'url_ipn'),
-  ])
+  ]
+  // A recurring charge binds the checksum to the customer's alias
+  if (body.recurring_alias !== undefined && body.recurring_alias !== null) {
+    fields.push(stringField(body, 'recurring_alias'))
+  }
+  body.checksum = checksum.secretSecond(service, fields)
   return {
     method: 'POST',
     host: API_PAYMENTS,
@@ -45,7 +51,7 @@ export function detailsOperation(
   transactionId: string,
 ): Operation<Transaction> {
   const body: Record<string, unknown> = { service, transaction_id: transactionId }
-  body.checksum = checksum.orderedBody(Object.values(body))
+  body.checksum = checksum.orderedBody(body)
   return {
     method: 'POST',
     host: PANEL,

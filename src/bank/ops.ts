@@ -17,7 +17,7 @@ export function forServiceOperation(
     service,
     timestamp: timestamp ?? Math.floor(Date.now() / 1000),
   }
-  body.checksum = checksum.orderedBody(Object.values(body))
+  body.checksum = checksum.orderedBody(body)
   return { method: 'POST', host: PANEL, path: '/api/v1/pbl/banks', body, parse: parseBanks }
 }
 

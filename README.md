@@ -44,7 +44,106 @@ if (payment.redirectUrl !== null) {
 }
 ```
 
+Adres `ipn` jest opcjonalny - bez niego IPN nie przychodzi, a wynik płatności dostajesz webhookiem.
+
+## Płatności cykliczne
+
+Rejestracja idzie razem z płatnością kodem BLIK klienta (kwota `0` - sama zgoda, więcej - opłata inicjalna).
+Kolejne obciążenia wysyła Twój serwer, bez kodu.
+
+```js
+import { Money, RecurringModel, TransactionType } from '@dpayglobal/dpay-node-sdk'
+
+const urls = { success: 'https://twojsklep.pl/sukces', fail: 'https://twojsklep.pl/blad' }
+
+const registration = await dpay.payments.register({
+  amount: Money.pln(0),
+  transactionType: TransactionType.TRANSFERS,
+  urls,
+  blikCode: kodBlik,
+  userAgent: req.headers['user-agent'],
+  userIp: req.ip,
+  recurringRegistration: {
+    label: 'Abonament Premium',
+    model: RecurringModel.O,
+    termsUrl: 'https://twojsklep.pl/regulamin',
+    alias: 'SUB-1234',
+  },
+})
+registration.recurringAlias // 'SUB-1234'
+
+const charge = await dpay.payments.register({
+  amount: Money.pln(4999),
+  transactionType: TransactionType.TRANSFERS,
+  urls,
+  recurringAlias: 'SUB-1234',
+  description: 'Abonament Premium 10/2026',
+})
+
+const status = await dpay.recurring.status('SUB-1234') // status.status: ACTIVE, INACTIVE, UNREGISTERED, EXPIRED, DECLINED
+const retry = await dpay.recurring.retry(charge.transactionId) // po odmowie, np. INSUFFICIENT_FUNDS
+await dpay.recurring.cancel('SUB-1234', { reason: 'Rezygnacja klienta' })
+```
+
+Model `A` wymaga `frequency` (np. `1M`), `limitAmt`, `totLimitAmt` (w groszach), `initDate` i `expirationDate`;
+model `O` nie przyjmuje częstotliwości ani limitów. SDK sprawdza to przed wysłaniem żądania.
+
+Obciążenie wiąże alias z sumą kontrolną, a anulowanie ma własną sumę - SDK liczy obie.
+Limity API: `status` do 60, `retry` i `cancel` do 30 zapytań na minutę (licznik wspólny z resztą API
+płatności z tego adresu IP) - nie odpytuj statusu w pętli, wynik przychodzi webhookiem.
+
+## Webhooki
+
+Zdarzenia (`payment.succeeded`, `refund.failed`, `recurring_payment.canceled` i inne) są podpisane
+(Standard Webhooks). **Weryfikuj je na surowych bajtach body**, przed parsowaniem JSON:
+
+```js
+import express from 'express'
+import { SignatureVerificationError, WebhookVerifier } from '@dpayglobal/dpay-node-sdk'
+
+app.post('/webhooks/dpay', express.raw({ type: 'application/json' }), (req, res) => {
+  let event
+  try {
+    // sekret endpointu z panelu (whsec_...); w czasie rotacji tablica sekretów
+    event = WebhookVerifier.constructEvent(req.body, req.headers, process.env.DPAY_WEBHOOK_SECRET)
+  } catch (error) {
+    if (error instanceof SignatureVerificationError) return res.status(400).end()
+    throw error
+  }
+
+  if (event.type === 'payment.succeeded') {
+    const payment = event.object // kwoty w groszach
+  }
+  res.status(200).end()
+})
+```
+
+`constructEvent` przyjmuje body jako `Buffer` albo `string` i nagłówki jako obiekt Node (`req.headers`)
+albo `Headers` (Next.js, Hono: `await request.text()` i `request.headers`). Deduplikuj zdarzenia po `event.id`.
+
+Historię zdarzeń (np. po awarii endpointu) pobierzesz przez Events API:
+
+```js
+for await (const event of dpay.events.iterate({ types: ['payment.succeeded'] })) {
+  // ...
+}
+```
+
+Własny adres zdarzeń jednej płatności (podpisywany sekretem webhooków serwisu):
+
+```js
+import { WebhookTarget } from '@dpayglobal/dpay-node-sdk'
+
+await dpay.payments.register({
+  ...params,
+  webhook: WebhookTarget.create('https://twojsklep.pl/webhooks', ['payment.succeeded', 'payment.failed']),
+  reference: 'order-1234',
+})
+```
+
 ## Obsługa IPN
+
+IPN przychodzi tylko wtedy, gdy podasz adres `ipn` w `urls`.
 
 dpay uznaje IPN za dostarczony wyłącznie, gdy body odpowiedzi to dokładnie `OK`.
 Kod HTTP nie jest sprawdzany. Zawsze porównaj kwotę z własnym zamówieniem -
@@ -69,7 +168,7 @@ app.post('/ipn', express.raw({ type: '*/*' }), async (req, res) => {
     throw error
   }
 
-  if (event.isTransfer || event.isCapture) {
+  if (event.isTransfer) {
     await oznaczZamowienieJakoOplacone(event.id, event.amount)
   }
 
@@ -91,13 +190,20 @@ export async function POST(request) {
 ## Zwroty
 
 ```js
-import { Money } from '@dpayglobal/dpay-node-sdk'
+import { Money, WebhookTarget } from '@dpayglobal/dpay-node-sdk'
 
 await dpay.refunds.create({ transactionId: 'identyfikator-transakcji' })
 await dpay.refunds.create({
   transactionId: 'identyfikator-transakcji',
   amount: Money.pln(500),
   reason: 'reklamacja',
+})
+
+// Odpowiedź oznacza przyjęcie zwrotu - wynik przychodzi zdarzeniem refund.succeeded / refund.failed
+await dpay.refunds.create({
+  transactionId: 'identyfikator-transakcji',
+  amount: Money.pln(500),
+  webhook: WebhookTarget.create('https://twojsklep.pl/webhooks/zwroty', ['refund.succeeded', 'refund.failed']),
 })
 
 const availability = await dpay.refunds.checkAvailability({ transactionId: 'identyfikator-transakcji' })
@@ -138,6 +244,10 @@ if (result.requiresThreeDsForm) {
 if (result.hasDccOffer) {
   const offer = result.dccOffer
 }
+
+// Preautoryzacja: pobranie (także częściowe) i anulowanie reszty; SDK dopina service i sumę kontrolną
+await dpay.cards.capture(transactionId, { amount: Money.pln(2999) })
+await dpay.cards.cancel(transactionId)
 ```
 
 Klucz publiczny jest rotowany - pobieraj go przed każdą próbą płatności.
@@ -156,7 +266,8 @@ try {
     error.fieldErrors
   } else if (error instanceof ApiError) {
     error.httpStatus
-    error.errorCode
+    error.errorCode // np. CHECKSUM_REQUIRED, WEBHOOK_URL_INVALID
+    error.reason // np. https_required przy WEBHOOK_URL_INVALID
   } else if (error instanceof TransportError) {
     // błąd sieci - status płatności nieznany, użyj payments.details()
   } else {
@@ -170,15 +281,15 @@ dyskryminator do użycia w `switch`, gdy `instanceof` zawodzi.
 
 | Wyjątek | Kiedy |
 |---|---|
-| `AuthenticationError` | 401 - niepoprawny checksum |
-| `InvalidRequestError` | 400, 422 |
+| `AuthenticationError` | 401 - niepoprawny lub brakujący checksum |
+| `InvalidRequestError` | 400, 422 (np. `fieldErrors.retry` przy ponowieniu płatności cyklicznej) |
 | `AccessDeniedError` | 403 |
 | `NotFoundError` | 404 |
 | `RateLimitError` | 429 |
 | `ApiServerError` | 5xx |
-| `PaymentRejectedError` | rejestracja odrzucona przy HTTP 200 |
+| `PaymentRejectedError` | rejestracja odrzucona przy HTTP 200 (`errorCode`, `errorDescription`) |
 | `CardPaymentError` | płatność kartą odrzucona przy HTTP 200 |
-| `SignatureVerificationError` | niepoprawny podpis IPN |
+| `SignatureVerificationError` | niepoprawny podpis IPN lub webhooka, webhook spoza tolerancji czasu |
 | `CardEncryptionError` | szyfrowanie danych karty nie powiodło się |
 | `TransportError` | awaria sieci, timeout lub przerwanie przez `signal` |
 | `DPayValueError` | niepoprawny argument - rzucany przed jakimkolwiek wywołaniem sieciowym |
