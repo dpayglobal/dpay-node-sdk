@@ -3,7 +3,7 @@ import { DPayValueError } from './errors.js'
 const PATTERN = /^[A-Z]{3}$/
 
 /** Currency codes used by dpay. Any ISO-4217 style code is accepted. */
-export const Currency = { PLN: 'PLN', EUR: 'EUR', CZK: 'CZK' } as const
+export const Currency = { PLN: 'PLN', EUR: 'EUR', CZK: 'CZK', USD: 'USD', RON: 'RON' } as const
 
 export type Currency = (typeof Currency)[keyof typeof Currency] | (string & {})
 

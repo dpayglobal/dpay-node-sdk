@@ -88,7 +88,106 @@ describe('CardService.payOtp', () => {
   it('raises CardPaymentError when success is not true', async () => {
     const { transport, cards } = build()
     transport.queueJson(200, { success: false, message: 'DCC_OFFER_EXPIRED' })
-    await expect(cards.payOtp('tx-1', { deviceInfo })).rejects.toBeInstanceOf(CardPaymentError)
+    const error = await cards.payOtp('tx-1', { deviceInfo }).catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(CardPaymentError)
+    expect((error as CardPaymentError).errorCode).toBe('DCC_OFFER_EXPIRED')
+    expect((error as CardPaymentError).httpStatus).toBe(200)
+    expect((error as CardPaymentError).cardError).toBeNull()
+  })
+
+  it('carries the card decline of a 200 answer', async () => {
+    const { transport, cards } = build()
+    transport.queueJson(200, {
+      success: false,
+      status: 'error',
+      message: 'Payment declined',
+      error: { code: 'payment_declined', declineCode: '05', declineMessage: 'Do not honor' },
+    })
+    const error = (await cards
+      .payOtp('tx-1', { deviceInfo })
+      .catch((caught: unknown) => caught)) as CardPaymentError
+    expect(error).toBeInstanceOf(CardPaymentError)
+    expect(error.message).toBe('Payment declined')
+    expect(error.errorCode).toBe('Payment declined')
+    expect(error.cardError).toEqual({
+      code: 'payment_declined',
+      declineCode: '05',
+      declineMessage: 'Do not honor',
+    })
+    expect(error.transactionId).toBeNull()
+  })
+
+  it('returns the Apple Pay merchant session of APPLE_PAY_INIT', async () => {
+    const { transport, cards } = build()
+    const session = { epochTimestamp: 1790503500000, merchantSessionIdentifier: 'SSH-1', signature: 'abc' }
+    transport.queueJson(200, {
+      success: true,
+      status: 'success',
+      message: {
+        redirectType: 'FORM',
+        redirectText: Buffer.from(JSON.stringify(session)).toString('base64'),
+      },
+    })
+    const result = await cards.applePay('tx-1', { deviceInfo })
+    expect(result.applePayMerchantSession).toEqual(session)
+
+    transport.queueJson(200, {
+      success: true,
+      message: {
+        redirectType: 'FORM',
+        redirectText:
+          'eyJlcG9jaFRpbWVzdGFtcCI6MTc5MDUwMzUwMDAwMCwibWVyY2hhbnRTZXNzaW9uSWRlbnRpZmllciI6IlNTSC0xIn0=',
+      },
+    })
+    expect((await cards.applePay('tx-1', { deviceInfo })).applePayMerchantSession).toEqual({
+      epochTimestamp: 1790503500000,
+      merchantSessionIdentifier: 'SSH-1',
+    })
+  })
+
+  it('has no merchant session for a 3-D Secure form or a non-object JSON', async () => {
+    const { transport, cards } = build()
+    transport.queueJson(200, {
+      success: true,
+      status: 'success',
+      message: { redirectType: 'FORM', redirectText: 'PGZvcm0gbWV0aG9kPSJQT1NUIj48L2Zvcm0+' },
+    })
+    const result = await cards.payOtp('tx-1', { deviceInfo })
+    expect(result.applePayMerchantSession).toBeNull()
+    expect(result.threeDsFormHtml).toBe('<form method="POST"></form>')
+
+    for (const text of ['[1,2]', '"text"', '42']) {
+      transport.queueJson(200, {
+        success: true,
+        message: { redirectType: 'FORM', redirectText: Buffer.from(text).toString('base64') },
+      })
+      expect((await cards.payOtp('tx-1', { deviceInfo })).applePayMerchantSession).toBeNull()
+    }
+    transport.queueJson(200, {
+      success: true,
+      message: { redirectType: 'URL', redirectText: Buffer.from('{"a":1}').toString('base64') },
+    })
+    expect((await cards.payOtp('tx-1', { deviceInfo })).applePayMerchantSession).toBeNull()
+  })
+
+  it('sends the Apple Pay email first', async () => {
+    const { transport, cards } = build()
+    transport.queueJson(200, { success: true, status: 'success', message: { redirectType: 'SUCCESS' } })
+    await cards.applePay('tx-1', {
+      token: 'APPLE-TOKEN',
+      deviceInfo,
+      email: 'client@example.com',
+      channelId: 31,
+    })
+    expect(Object.keys(transport.lastRequestBody)).toEqual([
+      'email',
+      'channelId',
+      'xPayType',
+      'xPayToken',
+      'deviceInfo',
+    ])
+    expect(transport.lastRequestBody.email).toBe('client@example.com')
+    expect(transport.lastRequestBody.xPayType).toBe('APPLE_PAY')
   })
 
   it('validates the DCC decision', async () => {
@@ -261,6 +360,7 @@ describe('CardService wallets', () => {
     transport.queueJson(200, { success: true, message: { redirectType: 'SUCCESS' } })
     await cards.applePay('tx-1', { deviceInfo })
     expect(transport.lastRequestBody.xPayType).toBe('APPLE_PAY_INIT')
+    expect(transport.lastRequestBody).not.toHaveProperty('email')
     expect(transport.lastRequestBody).not.toHaveProperty('xPayToken')
 
     transport.queueJson(200, { success: true, message: { redirectType: 'SUCCESS' } })

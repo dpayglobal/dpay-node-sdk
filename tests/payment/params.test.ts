@@ -128,7 +128,7 @@ describe('serializePayoutInstruction', () => {
 
   it('defaults the fee mode to net', () => {
     const payout = serializePayoutInstruction({
-      positions: [{ iban: 'PL61', title: 't', amount: Money.pln(1) }],
+      positions: [{ iban: 'PL61109010140000071219812874', title: 't', amount: Money.pln(1) }],
     })
     expect(payout.fee_mode).toBe('net')
   })
@@ -139,13 +139,15 @@ describe('serializePayoutInstruction', () => {
     )
     expect(() =>
       serializePayoutInstruction({ positions: [{ iban: '', title: 't', amount: Money.pln(1) }] }),
-    ).toThrow('Payout IBAN must not be empty')
+    ).toThrow('must be a valid Polish IBAN')
     expect(() =>
-      serializePayoutInstruction({ positions: [{ iban: 'PL61', title: '', amount: Money.pln(1) }] }),
+      serializePayoutInstruction({
+        positions: [{ iban: 'PL61109010140000071219812874', title: '', amount: Money.pln(1) }],
+      }),
     ).toThrow('Payout title must be 1-255 characters')
     expect(() =>
       serializePayoutInstruction({
-        positions: [{ iban: 'PL61', title: 't', amount: Money.pln(1) }],
+        positions: [{ iban: 'PL61109010140000071219812874', title: 't', amount: Money.pln(1) }],
         feeMode: 'nope',
       }),
     ).toThrow('Invalid payout fee mode "nope"')

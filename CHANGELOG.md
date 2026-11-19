@@ -6,6 +6,76 @@ wersjonowanie zgodne z [SemVer](https://semver.org/lang/pl/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-19
+
+Wersja dogania dokumentację API dpay (OpenAPI 1.6.0) i działa z obecnym API - nie wymaga nowego wydania API.
+Parytet z SDK PHP `0.3.0`: wspólne wektory `tests/fixtures/api_vectors.json` (9 sum `ordered_body`, 3 podpisy
+IPN), golden 29/29 żądań bajtowo identycznych (body rejestracji w CZK z `currency_code` sprawdzone SDK PHP 0.3.0),
+592/592 wartości odpowiedzi zgodne.
+
+### Breaking
+
+- **BREAKING** `refunds.checkAvailability()` zwraca `RefundAvailability` (niedostępny) zamiast rzucać błąd
+  dla każdej odpowiedzi 4xx z kluczem `refund`, w tym 404 (transakcja nie istnieje, wcześniej `NotFoundError`)
+  i 423 (zwrot przez BOK dpay). Przyczynę rozróżnia `httpStatus`. Nadal rzucają: 401 "Unauthorized request"
+  (`AuthenticationError`), 422, 429 i 5xx.
+- **BREAKING** Waluta kwoty trafia do `currency_code`: `Money` w walucie innej niż PLN wysyła `currency_code`
+  bez `currencyCode` (wcześniej np. `Money.of(49900, 'CZK')` rejestrowało 499.00 w walucie domyślnej serwisu).
+  `currencyCode` (także obok `phoneNumber`) rzuca `DPayValueError`, gdy waluta różni się od waluty kwoty - dla
+  MB WAY użyj `Money.of(grosze, Currency.EUR)` zamiast `Money.pln()`. Kwota w PLN bez jawnego kodu wysyła body
+  jak dotąd (bez `currency_code`).
+- **BREAKING** `constructIpnEvent()` / `dpay.ipn.constructEvent()` przyjmuje IPN `alias_update` (wcześniej rzucał
+  `SignatureVerificationError` "Invalid IPN payload"). Przychodzi on na adres IPN, gdy rejestracja nie miała
+  `aliasIpnUrl` - obsługa, która oznacza zamówienie jako opłacone bez sprawdzenia `isTransfer`, potraktowałaby
+  zmianę aliasu (np. `ALIAS_DECLINED`) jak wpłatę. Dla `alias_update` `amount` jest puste, a `email`, `custom`
+  i `attempt` to null/0 (te pola nie są podpisane).
+
+### Added
+
+- IPN `alias_update` (BLIK OneClick i płatności cykliczne): weryfikacja podpisu `sha256(id . hash . type . version)`,
+  `IpnType.ALIAS_UPDATE`, `IpnEvent.isAliasUpdate` i `aliasUpdate` (`AliasUpdate`; stałe `AliasChangeType`,
+  `IpnAliasType`, statusy z `RecurringAliasStatus`).
+- `CardError` (`code`, `declineCode`, `declineMessage`): `CardPaymentError.cardError` z obiektu `error` odmowy
+  karty oraz `ApiError.cardError` i `ApiError.transactionId` z pól `cardError` i `transactionId` błędu Payments
+  API (np. odrzucone pobranie na zapisanej karcie).
+- `dpay.payouts.list()` i `iterate()` (`POST /api/v1/pbl/withdraws`, filtry `dateFrom`, `dateTo`, `state`, `type`,
+  strony do 200) oraz `detailsFull()` (`POST /api/v1/pbl/withdraws/details/full`: nagłówek, sumy całego
+  rozliczenia i pozycje z `paymentId`, `custom`, `ipksef`, strony do 500); typy `PayoutPage`, `PayoutListItem`,
+  `PayoutSettlement`, `SettlementPosition`, `PageMeta` i stałe `PayoutState`, `PayoutType`.
+- `PayoutDetails.currency` (z `currency_code`, PLN gdy go brak), `exportDate` i `isPaysafecard`.
+- `refunds.create({ messageId })` - nagłówek `DigitalPayments-PSP-Message-ID` (tytuł przelewu
+  `dpay.pl zwrot {messageId}`, poza sumą kontrolną), stała `REFUND_MESSAGE_ID_HEADER`.
+- `RegisteredPayment.multibanco` (`MultibancoReference`: encja, referencja, kwota, ważność) i `paidTransaction`
+  (`RegisteredTransaction` z odpowiedzi "Transaction paid", statusy `RegisteredTransactionStatus`: pending, paid,
+  captured, canceled).
+- Typowane obiekty webhooków: `WebhookEvent.payment`, `refund`, `recurringPayment`, `payout` (`PaymentObject`,
+  `RefundObject`, `RecurringPaymentObject`, `PayoutObject`), `Failure`, `DeclineCode` (22 kody odmów dpay),
+  `FailureCategory` i stałe statusów (`PaymentObjectStatus`, `RefundObjectStatus`, `RecurringPaymentStatus`,
+  `PayoutObjectStatus`, `RecurringSequence`, `RecurringCanceledBy`).
+- `RecurringRetryResult.isSuccess` i `RetryRefusal` (kody `errors.retry` odmowy ponowienia).
+- `Transaction.rate`, `minimalFee`, `permanentFee` i `urls` (`TransactionUrls`).
+- `ApplePayParams.email` i `CardPaymentResult.applePayMerchantSession` (sesja ApplePayMerchantSession
+  z `redirectText` odpowiedzi APPLE_PAY_INIT).
+- `RateLimitError.reset` (nagłówek `X-RateLimit-Reset`), `Currency.USD` i `Currency.RON`, `isValidPolishIban()`.
+- `tests/fixtures/api_vectors.json`: wektory IPN transfer, dcb i alias_update oraz sum list i szczegółów wypłat.
+
+### Changed
+
+- Walidacja przed wysłaniem tego, co API i tak odrzuca (422 lub 400):
+  - etykieta `registerBlikAlias` i `recurringRegistration` do 35 znaków (limit BLIK, wcześniej 50);
+  - `mb_way_direct` wymaga kanału (`channel: '373'`) i `deviceInfo` z `browserJavaEnabled`;
+  - kanał bezpośredni wymaga emaila, imienia i nazwiska płatnika oraz `acceptTos`; kanały `tester`, `paypal`,
+    `installment` i `paysafecard` są odrzucane; pusty `channel` (`''`) jest wysyłany jak dotąd i oznacza brak
+    kanału;
+  - `phoneNumber` 9-15 znaków, `aliasIpnUrl` do 500 znaków;
+  - `efaktura` nie łączy się z `blikCode`, `blikAlias`, `registerBlikAlias`, płatnościami cyklicznymi ani
+    aliasami kart;
+  - pozycja wypłaty (`payout.positions`): IBAN `PL` + 26 cyfr z poprawną sumą kontrolną mod 97 (spacje i małe
+    litery dozwolone) i kwota powyżej 0.
+- `ApiError.transactionId` przeniesione z `PaymentRejectedError` do klasy bazowej (bez zmiany zachowania).
+- Daty filtrów listy wypłat są wysyłane i podpisywane bez białych znaków na brzegach (API przycina je przed
+  sprawdzeniem sumy kontrolnej).
+
 ## [0.2.0] - wydanie razem z wdrożeniem API dpay
 
 Wersja wymaga API dpay z tym samym wydaniem (wspólne API płatności cyklicznych, suma kontrolna capture

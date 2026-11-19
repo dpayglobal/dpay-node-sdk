@@ -1,9 +1,20 @@
 import { record, strictString } from '../payment/models.js'
 import type { WebhookEventType } from './event-type.js'
+import {
+  type PaymentObject,
+  type PayoutObject,
+  type RecurringPaymentObject,
+  type RefundObject,
+  parsePaymentObject,
+  parsePayoutObject,
+  parseRecurringPaymentObject,
+  parseRefundObject,
+} from './objects.js'
 
 /**
  * Webhook event envelope: `{id, type, api_version, created, livemode, service, [merchant_ref], data: {object}}`.
- * `object` stays a plain object - payment, refund, recurring_payment or payout, amounts in minor units.
+ * `data.object` is available as a plain object (`object`) and as a typed model of its kind: `payment`, `refund`,
+ * `recurringPayment`, `payout` - amounts in minor units.
  */
 export interface WebhookEvent {
   /** `evt_...`, the same on every delivery attempt - deduplicate on it. */
@@ -22,6 +33,14 @@ export interface WebhookEvent {
   readonly object: Record<string, unknown>
   /** `payment`, `refund`, `recurring_payment`, `payout` or `webhook_endpoint`. */
   readonly objectType: string | null
+  /** The `payment` object of payment.* events; null for other objects. */
+  readonly payment: PaymentObject | null
+  /** The `refund` object of refund.* events; null for other objects. */
+  readonly refund: RefundObject | null
+  /** The `recurring_payment` object of recurring_payment.* events; null for other objects. */
+  readonly recurringPayment: RecurringPaymentObject | null
+  /** The `payout` object of payout.* events; null for other objects. */
+  readonly payout: PayoutObject | null
   readonly raw: Record<string, unknown>
 }
 
@@ -38,6 +57,7 @@ export interface EventPage {
 /** Builds a frozen `WebhookEvent` from a decoded event envelope. */
 export function parseWebhookEvent(data: Record<string, unknown>): WebhookEvent {
   const object = record(record(data.data)?.object) ?? {}
+  const objectType = strictString(object, 'object')
   return Object.freeze({
     id: strictString(data, 'id') ?? '',
     type: strictString(data, 'type') ?? '',
@@ -47,7 +67,11 @@ export function parseWebhookEvent(data: Record<string, unknown>): WebhookEvent {
     service: strictString(data, 'service'),
     merchantRef: strictString(data, 'merchant_ref'),
     object,
-    objectType: strictString(object, 'object'),
+    objectType,
+    payment: objectType === 'payment' ? parsePaymentObject(object) : null,
+    refund: objectType === 'refund' ? parseRefundObject(object) : null,
+    recurringPayment: objectType === 'recurring_payment' ? parseRecurringPaymentObject(object) : null,
+    payout: objectType === 'payout' ? parsePayoutObject(object) : null,
     raw: data,
   })
 }

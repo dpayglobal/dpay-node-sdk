@@ -35,14 +35,14 @@ export function registerOperation(
     host: API_PAYMENTS,
     path: '/api/v1_0/payments/register',
     body,
-    parse: parseRegisterResponse,
+    parse: (response) => parseRegisterResponse(response, params.amount.currency),
   }
 }
 
-function parseRegisterResponse(response: ApiResponse): RegisteredPayment {
+function parseRegisterResponse(response: ApiResponse, currency: string): RegisteredPayment {
   const data = decodeRecordOrFail(response)
   if (data.error === true || data.status === false) throw PaymentRejectedError.fromApi(data)
-  return parseRegisteredPayment(data)
+  return parseRegisteredPayment(data, currency)
 }
 
 export function detailsOperation(

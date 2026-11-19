@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { Currency } from '../../src/currency.js'
 import { DPayValueError } from '../../src/errors.js'
 import { Money } from '../../src/money.js'
-import type { DeviceInfoParams } from '../../src/payment/params.js'
+import { type DeviceInfoParams, isValidPolishIban } from '../../src/payment/params.js'
 import { buildRegisterBody } from '../../src/payment/register-body.js'
 import type { RegisterPaymentParams } from '../../src/payment/register-body.js'
 import { WebhookTarget } from '../../src/webhook/target.js'
@@ -103,13 +104,16 @@ describe('buildRegisterBody', () => {
       paypal: true,
       noBanks: false,
       phoneNumber: '+48123456789',
-      currencyCode: 'EUR',
+      currencyCode: 'PLN',
       partnerPlatform: 'SHOPIFY01',
       aliasIpnUrl: 'https://shop.test/alias-ipn',
       noDelay: true,
       authorizeOnly: false,
       cardRecurringOperation: 'charge',
-      payout: { positions: [{ iban: 'PL61', title: 't', amount: Money.pln(1050) }], feeMode: 'gross' },
+      payout: {
+        positions: [{ iban: 'PL61109010140000071219812874', title: 't', amount: Money.pln(1050) }],
+        feeMode: 'gross',
+      },
       billingAddress: { street: 'Testowa 1' },
       shippingAddress: { street: 'Inna 2' },
       products: [{ name: 'Produkt', price: 29.99 }],
@@ -162,7 +166,8 @@ describe('buildRegisterBody', () => {
       recurringRegistration: { label: 'Sub', model: 'O', termsUrl: 'https://shop.test/terms' },
       aliasIpnUrl: 'https://shop.test/alias-ipn',
       authorizeOnly: true,
-      efaktura: true,
+      // 0.3.0: efaktura (true) cannot be combined with a BLIK code - false only keeps its position covered
+      efaktura: false,
       webhook: WebhookTarget.create('https://shop.test/webhooks'),
       reference: 'order-1',
     })
@@ -359,5 +364,271 @@ describe('buildRegisterBody', () => {
       'card_recurring_alias',
       'authorize_only',
     ])
+  })
+})
+
+describe('buildRegisterBody currency (0.3.0)', () => {
+  it('sends the currency of a non-PLN amount', () => {
+    const body = buildRegisterBody('MyShop', {
+      amount: Money.of(49900, Currency.CZK),
+      transactionType: 'transfers',
+      urls,
+    })
+    expect(body.value).toBe('499.00')
+    expect(body.currency_code).toBe('CZK')
+    expect(Object.keys(body)).toEqual([
+      'service',
+      'value',
+      'transactionType',
+      'url_success',
+      'url_fail',
+      'url_ipn',
+      'currency_code',
+    ])
+  })
+
+  it('sends no currency for PLN unless asked to', () => {
+    expect(buildRegisterBody('MyShop', { ...minimal, amount: Money.pln(1000) })).not.toHaveProperty(
+      'currency_code',
+    )
+    expect(
+      buildRegisterBody('MyShop', { ...minimal, amount: Money.pln(1000), currencyCode: Currency.PLN })
+        .currency_code,
+    ).toBe('PLN')
+    expect(Currency.USD).toBe('USD')
+    expect(Currency.RON).toBe('RON')
+    expect(buildRegisterBody('S', { ...minimal, amount: Money.of(100, Currency.RON) }).currency_code).toBe(
+      'RON',
+    )
+  })
+
+  it('requires the currency code to match the amount', () => {
+    expect(() =>
+      buildRegisterBody('MyShop', { ...minimal, amount: Money.pln(500), currencyCode: 'EUR' }),
+    ).toThrow('Currency code "EUR" does not match the amount currency "PLN"')
+    expect(() =>
+      buildRegisterBody('MyShop', {
+        ...minimal,
+        amount: Money.pln(500),
+        phoneNumber: '+351912345678',
+        currencyCode: 'EUR',
+      }),
+    ).toThrow(DPayValueError)
+    expect(() => buildRegisterBody('MyShop', { ...minimal, currencyCode: 'eur' })).toThrow(
+      'Invalid currency code "eur"',
+    )
+  })
+
+  it('checks the phone number length in characters', () => {
+    const base = { ...minimal, amount: Money.of(500, 'EUR'), currencyCode: 'EUR' }
+    for (const phoneNumber of ['+3519123', '+351912345678901']) {
+      expect(() => buildRegisterBody('MyShop', { ...base, phoneNumber })).toThrow(
+        'Phone number must be 9-15 characters',
+      )
+    }
+    expect(buildRegisterBody('MyShop', { ...base, phoneNumber: '+35191234' }).phone_number).toBe('+35191234')
+  })
+})
+
+describe('buildRegisterBody direct channels and MB WAY (0.3.0)', () => {
+  const mbWay: RegisterPaymentParams = {
+    amount: Money.of(500, Currency.EUR),
+    transactionType: 'mb_way_direct',
+    urls,
+    phoneNumber: '+351912345678',
+    currencyCode: Currency.EUR,
+    channel: '373',
+    payer: { email: 'client@example.com', firstName: 'Joao', lastName: 'Silva' },
+    acceptTos: true,
+    deviceInfo: { ...device, browserJavaEnabled: false },
+  }
+
+  it('builds a valid MB WAY registration', () => {
+    const body = buildRegisterBody('MyShop', mbWay)
+    expect(body.phone_number).toBe('+351912345678')
+    expect(body.currency_code).toBe('EUR')
+    expect(body.channel).toBe('373')
+    expect((body.device_info as Record<string, unknown>).browserJavaEnabled).toBe('false')
+  })
+
+  it('requires a channel and browserJavaEnabled for MB WAY', () => {
+    const { channel: _channel, ...withoutChannel } = mbWay
+    expect(() => buildRegisterBody('MyShop', withoutChannel)).toThrow('requires a channel')
+    expect(() => buildRegisterBody('MyShop', { ...mbWay, channel: '' })).toThrow('requires a channel')
+    const { browserJavaEnabled: _java, ...withoutJava } = device
+    expect(() => buildRegisterBody('MyShop', { ...mbWay, deviceInfo: withoutJava })).toThrow(
+      'browserJavaEnabled',
+    )
+    const { deviceInfo: _device, ...withoutDevice } = mbWay
+    expect(() => buildRegisterBody('MyShop', withoutDevice)).toThrow('browserJavaEnabled')
+  })
+
+  it('requires the payer and the terms acceptance with a direct channel', () => {
+    const base: RegisterPaymentParams = { ...minimal, amount: Money.pln(1000), channel: '24900005' }
+    expect(() => buildRegisterBody('MyShop', { ...base, acceptTos: true })).toThrow(
+      'email, first name and last name',
+    )
+    expect(() =>
+      buildRegisterBody('MyShop', { ...base, acceptTos: true, payer: { email: 'client@example.com' } }),
+    ).toThrow('first name')
+    expect(() =>
+      buildRegisterBody('MyShop', {
+        ...base,
+        acceptTos: true,
+        payer: { email: 'client@example.com', firstName: 'Jan', lastName: '' },
+      }),
+    ).toThrow('last name')
+    expect(() =>
+      buildRegisterBody('MyShop', {
+        ...base,
+        acceptTos: true,
+        payer: { firstName: 'Jan', lastName: 'Kowalski' },
+      }),
+    ).toThrow('email')
+    expect(() =>
+      buildRegisterBody('MyShop', {
+        ...base,
+        payer: { email: 'client@example.com', firstName: 'Jan', lastName: 'Kowalski' },
+      }),
+    ).toThrow('acceptTos')
+  })
+
+  it('sends declined terms as false', () => {
+    const body = buildRegisterBody('MyShop', {
+      ...minimal,
+      channel: '24900005',
+      payer: { email: 'client@example.com', firstName: 'Jan', lastName: 'Kowalski' },
+      acceptTos: false,
+    })
+    expect(body.accept_tos).toBe(false)
+  })
+
+  it.each(['tester', 'paypal', 'installment', 'paysafecard'])('refuses the direct channel %s', (channel) => {
+    expect(() => buildRegisterBody('MyShop', { ...minimal, channel })).toThrow(
+      `Channel "${channel}" cannot be used as a direct payment channel`,
+    )
+  })
+
+  it('treats an empty channel as no channel, sent as in 0.2.0', () => {
+    // The API turns "" into null (ConvertEmptyStringsToNull), so it needs no payer or terms
+    const body = buildRegisterBody('MyShop', { ...minimal, channel: '' })
+    expect(body.channel).toBe('')
+    const recurring = buildRegisterBody('MyShop', {
+      ...minimal,
+      channel: '',
+      blikCode: '123456',
+      userAgent: 'UA/1.0',
+      userIp: '10.0.0.1',
+      recurringRegistration: { label: 'Sub', model: 'O', termsUrl: 'https://shop.test/terms' },
+    })
+    expect(recurring.channel).toBe('')
+    expect(() =>
+      buildRegisterBody('MyShop', {
+        ...minimal,
+        channel: '86',
+        payer: { email: 'client@example.com', firstName: 'Jan', lastName: 'Kowalski' },
+        acceptTos: true,
+        blikCode: '123456',
+        userAgent: 'UA/1.0',
+        userIp: '10.0.0.1',
+        recurringRegistration: { label: 'Sub', model: 'O', termsUrl: 'https://shop.test/terms' },
+      }),
+    ).toThrow('channel cannot be combined with a recurring payment')
+  })
+
+  it('accepts an alias IPN URL of at most 500 characters', () => {
+    const url = `https://shop.example/${'a'.repeat(479)}`
+    expect(url).toHaveLength(500)
+    expect(buildRegisterBody('S', { ...minimal, aliasIpnUrl: url }).alias_ipn_url).toBe(url)
+    expect(() => buildRegisterBody('S', { ...minimal, aliasIpnUrl: `${url}a` })).toThrow(
+      'Invalid alias IPN URL',
+    )
+  })
+})
+
+describe('buildRegisterBody efaktura combinations (0.3.0)', () => {
+  const blik = { userAgent: 'UA', userIp: '1.2.3.4' }
+  it.each([
+    ['blik_code', { blikCode: '777123', ...blik }],
+    ['blik_alias', { blikAlias: 'DPAY.UID.1.a', ...blik }],
+    ['register_blik_alias', { registerBlikAlias: { label: 'Sklep' } }],
+    // A recurring registration needs a BLIK code, which is the first conflict
+    [
+      'blik_code',
+      {
+        blikCode: '777123',
+        ...blik,
+        recurringRegistration: { label: 'S', model: 'O', termsUrl: 'https://shop.test/t' },
+      },
+    ],
+    ['recurring_alias', { recurringAlias: 'SUB-0001' }],
+    ['register_card_recurring', { registerCardRecurring: { label: 'Mandat' } }],
+    ['card_recurring_alias', { cardRecurringAlias: 'CARD-1' }],
+  ] as Array<[string, Partial<RegisterPaymentParams>]>)('refuses efaktura with %s', (field, extra) => {
+    expect(() => buildRegisterBody('MyShop', { ...minimal, efaktura: true, ...extra })).toThrow(
+      `efaktura cannot be combined with ${field}`,
+    )
+  })
+
+  it('allows efaktura without them', () => {
+    expect(buildRegisterBody('MyShop', { ...minimal, efaktura: true }).efaktura).toBe(true)
+    expect(
+      buildRegisterBody('MyShop', { ...minimal, efaktura: false, recurringAlias: 'SUB-1' }).efaktura,
+    ).toBe(false)
+  })
+})
+
+describe('payout positions and BLIK labels (0.3.0)', () => {
+  it('requires a valid Polish IBAN, sent as given', () => {
+    const body = buildRegisterBody('S', {
+      ...minimal,
+      payout: {
+        positions: [{ iban: 'pl61 1090 1014 0000 0712 1981 2874', title: 'FV 1', amount: Money.pln(100) }],
+      },
+    })
+    expect((body.payout as { positions: Array<{ iban: string }> }).positions[0]?.iban).toBe(
+      'pl61 1090 1014 0000 0712 1981 2874',
+    )
+    expect(isValidPolishIban('PL61109010140000071219812874')).toBe(true)
+    expect(isValidPolishIban('PL61\t1090 1014 0000 0712 1981 2874\n')).toBe(true)
+    for (const iban of [
+      'PL61109010140000071219812875',
+      'DE89370400440532013000',
+      '61109010140000071219812874',
+      '',
+    ]) {
+      expect(isValidPolishIban(iban)).toBe(false)
+      expect(() =>
+        buildRegisterBody('S', {
+          ...minimal,
+          payout: { positions: [{ iban, title: 'FV 1', amount: Money.pln(100) }] },
+        }),
+      ).toThrow('valid Polish IBAN')
+    }
+  })
+
+  it('requires a payout amount above 0', () => {
+    for (const amount of [Money.pln(0), Money.pln(-100)]) {
+      expect(() =>
+        buildRegisterBody('S', {
+          ...minimal,
+          payout: { positions: [{ iban: 'PL61109010140000071219812874', title: 'FV 1', amount }] },
+        }),
+      ).toThrow('Payout amount must be above 0')
+    }
+  })
+
+  it('limits the BLIK alias label to 35 characters', () => {
+    expect(
+      buildRegisterBody('S', { ...minimal, registerBlikAlias: { label: 'a'.repeat(35) } })
+        .register_blik_alias,
+    ).toEqual({
+      label: 'a'.repeat(35),
+      type: 'UID',
+    })
+    expect(buildRegisterBody('S', { ...minimal, registerBlikAlias: { label: 'ż'.repeat(35) } })).toBeTruthy()
+    expect(() =>
+      buildRegisterBody('S', { ...minimal, registerBlikAlias: { label: 'a'.repeat(36) } }),
+    ).toThrow('Alias label must be 1-35 characters')
   })
 })

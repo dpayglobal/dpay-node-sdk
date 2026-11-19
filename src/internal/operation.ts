@@ -8,6 +8,11 @@ export interface Operation<T> {
   readonly path: string
   readonly parse: (response: ApiResponse) => T
   readonly body?: Record<string, unknown>
+  /**
+   * Extra request headers (for example `DigitalPayments-PSP-Message-ID`), sent after `Accept` and `User-Agent`.
+   * Names must match `^[A-Za-z0-9-]+$`, values must not contain control characters.
+   */
+  readonly headers?: Readonly<Record<string, string>>
   readonly raiseForStatus?: boolean
 }
 

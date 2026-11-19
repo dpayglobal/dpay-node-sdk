@@ -1,4 +1,5 @@
 import { DPayValueError } from '../errors.js'
+import { phpMbStrlen } from '../internal/php.js'
 import { isValidDate } from '../internal/validation.js'
 import type { Money } from '../money.js'
 import { PayoutFeeMode, assertPayoutFeeMode } from './enums.js'
@@ -39,6 +40,7 @@ export interface DeviceInfoParams {
   deviceId: string
   /** 1 to 64 characters. */
   applicationName: string
+  /** Sent as `"true"` / `"false"`. MB WAY (`mb_way_direct`) registration requires it. */
   browserJavaEnabled?: boolean | undefined
 }
 
@@ -54,10 +56,31 @@ export interface InvoiceParams {
 
 /** One leg of a 1:1 payout attached to a payment. */
 export interface PayoutPositionParams {
+  /** Polish IBAN of one of your verified bank accounts (`PL` + 26 digits, spaces allowed), sent as given. */
   iban: string
   /** 1 to 255 characters. */
   title: string
+  /** Above 0. */
   amount: Money
+}
+
+const IBAN_WHITESPACE = /[ \t\n\v\f\r]/g
+const POLISH_IBAN = /^PL\d{26}$/
+
+/**
+ * `PL` + 26 digits after removing whitespace and upper-casing, with a valid ISO 13616 check (mod 97 = 1).
+ */
+export function isValidPolishIban(iban: string): boolean {
+  if (typeof iban !== 'string') return false
+  const normalized = iban.replace(IBAN_WHITESPACE, '').toUpperCase()
+  if (!POLISH_IBAN.test(normalized)) return false
+  // Country code and check digits go to the end, letters become numbers (P = 25, L = 21)
+  const numeric = `${normalized.slice(4)}2521${normalized.slice(2, 4)}`
+  let remainder = 0
+  for (let index = 0; index < numeric.length; index += 7) {
+    remainder = Number(`${remainder}${numeric.slice(index, index + 7)}`) % 97
+  }
+  return remainder === 1
 }
 
 /** Payout instruction attached to a payment. */
@@ -110,7 +133,7 @@ export function serializeInvoice(invoice: InvoiceParams): Record<string, unknown
   return data
 }
 
-/** Builds the wire-format payout object, requiring at least one position with valid IBAN and title (1-255 characters). Throws DPayValueError if validation fails. */
+/** Builds the wire-format payout object, requiring at least one position with a valid Polish IBAN, a title (1-255 characters) and an amount above 0. Throws DPayValueError if validation fails. */
 export function serializePayoutInstruction(payout: PayoutInstructionParams): Record<string, unknown> {
   if (payout.positions.length === 0) {
     throw new DPayValueError('Payout instruction requires at least one position')
@@ -120,10 +143,15 @@ export function serializePayoutInstruction(payout: PayoutInstructionParams): Rec
   return {
     fee_mode: feeMode,
     positions: payout.positions.map((position) => {
-      if (position.iban === '') throw new DPayValueError('Payout IBAN must not be empty')
-      if (position.title === '' || position.title.length > 255) {
+      if (!isValidPolishIban(position.iban)) {
+        throw new DPayValueError(
+          `Payout IBAN "${position.iban}" must be a valid Polish IBAN (PL + 26 digits)`,
+        )
+      }
+      if (position.title === '' || phpMbStrlen(position.title) > 255) {
         throw new DPayValueError('Payout title must be 1-255 characters')
       }
+      if (position.amount.minor <= 0) throw new DPayValueError('Payout amount must be above 0')
       return { iban: position.iban, title: position.title, amount: Number(position.amount.toDecimal()) }
     }),
   }

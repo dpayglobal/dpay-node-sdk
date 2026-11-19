@@ -27,6 +27,7 @@ export {
   TransportError,
 } from './errors.js'
 export type { DPayErrorType } from './errors.js'
+export type { CardError } from './card/card-error.js'
 
 export { PayoutFeeMode, TransactionStatus, TransactionType } from './payment/enums.js'
 export type {
@@ -37,15 +38,39 @@ export type {
   PayoutPositionParams,
   ReturnUrls,
 } from './payment/params.js'
+export { isValidPolishIban } from './payment/params.js'
 export type { RegisterPaymentParams } from './payment/register-body.js'
-export type { RegisteredPayment, Transaction, TransactionRefund } from './payment/models.js'
+export { RegisteredTransactionStatus } from './payment/models.js'
+export type {
+  MultibancoReference,
+  RegisteredPayment,
+  RegisteredTransaction,
+  Transaction,
+  TransactionRefund,
+  TransactionUrls,
+} from './payment/models.js'
 
 export type { Refund, RefundAvailability } from './refund/models.js'
+export { REFUND_MESSAGE_ID_HEADER } from './refund/ops.js'
 export type { CreateRefundParams, RefundParams } from './refund/ops.js'
 
 export type { Bank } from './bank/models.js'
-export type { PayoutDetails, PayoutReceiver } from './payout/models.js'
-export type { PayoutDetailsParams } from './payout/ops.js'
+export { PayoutState, PayoutType } from './payout/enums.js'
+export type {
+  PageMeta,
+  PayoutDetails,
+  PayoutListItem,
+  PayoutPage,
+  PayoutReceiver,
+  PayoutSettlement,
+  SettlementPosition,
+} from './payout/models.js'
+export type {
+  ListPayoutsParams,
+  PayoutDetailsFullParams,
+  PayoutDetailsParams,
+  PayoutFilters,
+} from './payout/ops.js'
 
 export { BlikAliasType } from './blik/enums.js'
 export type { BlikAliasRegistrationParams } from './blik/params.js'
@@ -57,6 +82,7 @@ export {
   RecurringMethod,
   RecurringModel,
   RecurringRetryStatus,
+  RetryRefusal,
 } from './recurring/enums.js'
 export type { RecurringRegistrationParams } from './recurring/params.js'
 export type { RecurringCancelParams } from './recurring/ops.js'
@@ -67,6 +93,23 @@ export { WebhookTarget } from './webhook/target.js'
 export { WebhookVerifier } from './webhook/verifier.js'
 export type { WebhookHeaders, WebhookSecrets, WebhookVerifyOptions } from './webhook/verifier.js'
 export type { EventPage, WebhookEvent } from './webhook/event.js'
+export {
+  DeclineCode,
+  FailureCategory,
+  PaymentObjectStatus,
+  PayoutObjectStatus,
+  RecurringCanceledBy,
+  RecurringPaymentStatus,
+  RecurringSequence,
+  RefundObjectStatus,
+} from './webhook/objects.js'
+export type {
+  Failure,
+  PaymentObject,
+  PayoutObject,
+  RecurringPaymentObject,
+  RefundObject,
+} from './webhook/objects.js'
 export type { EventFilters, ListEventsParams } from './webhook/ops.js'
 
 export { CardRecurringFrequency, CardRecurringOperation, DccDecision, RedirectType } from './card/enums.js'
@@ -82,7 +125,7 @@ export type {
 } from './card/params.js'
 export type { CardPaymentResult, DccMarkup, DccOffer } from './card/models.js'
 
-export { IPN_ACK, IpnType } from './ipn/event.js'
-export type { IpnEvent } from './ipn/event.js'
+export { AliasChangeType, IPN_ACK, IpnAliasType, IpnType } from './ipn/event.js'
+export type { AliasUpdate, IpnEvent } from './ipn/event.js'
 export { constructIpnEvent } from './ipn/verifier.js'
 export { readRawBody } from './ipn/request.js'

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DPayValueError, SignatureVerificationError } from '../../src/errors.js'
 import { ChecksumCalculator } from '../../src/internal/checksum.js'
+import { constructIpnEvent } from '../../src/ipn/verifier.js'
 import { WebhookVerifier } from '../../src/webhook/verifier.js'
 
 /**
@@ -25,6 +26,7 @@ interface ApiVectors {
     signature: string
     rotation_signature: string
   }
+  ipn: Array<{ name: string; payload: Record<string, unknown> }>
 }
 
 const VECTORS = JSON.parse(
@@ -43,7 +45,8 @@ describe('shared API vectors', () => {
   it('has every section the PHP SDK checks', () => {
     expect(VECTORS.secret_second).toHaveLength(10)
     expect(VECTORS.operation).toHaveLength(4)
-    expect(VECTORS.ordered_body).toHaveLength(3)
+    expect(VECTORS.ordered_body).toHaveLength(9)
+    expect(VECTORS.ipn).toHaveLength(3)
   })
 
   it.each(VECTORS.secret_second.map((vector) => [vector.name, vector] as const))(
@@ -80,6 +83,25 @@ describe('shared API vectors', () => {
         w: { v: 'b' },
       }),
     ).toBe(expected)
+  })
+})
+
+describe('shared IPN vectors', () => {
+  it.each(VECTORS.ipn.map((vector) => [vector.name, vector] as const))('ipn %s', (_name, vector) => {
+    const body = JSON.stringify(vector.payload)
+    const event = constructIpnEvent(body, VECTORS.secret_hash)
+    expect(event.id).toBe(VECTORS.transaction_id)
+    expect(event.raw).toEqual(vector.payload)
+    expect(() => constructIpnEvent(body, `${VECTORS.secret_hash}x`)).toThrow('Invalid IPN signature')
+  })
+
+  it('reads the alias_update vector', () => {
+    const vector = VECTORS.ipn.find((item) => item.name === 'alias_update_recurring_register')
+    const event = constructIpnEvent(JSON.stringify(vector?.payload), VECTORS.secret_hash)
+    expect(event.isAliasUpdate).toBe(true)
+    expect(event.aliasUpdate?.aliasType).toBe('PAYID')
+    expect(event.aliasUpdate?.isActive).toBe(true)
+    expect(event.aliasUpdate?.changeReasonCategory).toBeNull()
   })
 })
 

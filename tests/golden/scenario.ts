@@ -51,9 +51,10 @@ export async function runRequestScenario(): Promise<Record<string, unknown>> {
   const dpay = new DPayClient({ service: SERVICE, secretHash: SECRET, httpClient: transport })
   const out: Record<string, unknown> = {}
 
+  // 0.3.0: currency_code must equal the amount currency - EUR amount, the body is unchanged
   transport.queueJson(200, { transactionId: 'tx-1', msg: 'https://secure.dpay.pl/pay/1' })
   await dpay.payments.register({
-    amount: Money.pln(2999),
+    amount: Money.of(2999, 'EUR'),
     transactionType: 'transfers',
     urls,
     description: 'Zamówienie #1234 / ĄĘŚŻ',
@@ -117,7 +118,7 @@ export async function runRequestScenario(): Promise<Record<string, unknown>> {
     },
   })
 
-  // [2] alias OneClick tylko UID
+  // [2] alias OneClick tylko UID; 0.3.0: kwota w CZK wysyła currency_code (body sprawdzone SDK PHP 0.3.0)
   transport.queueJson(200, { transactionId: 'tx-3', msg: 'ok' })
   await dpay.payments.register({
     amount: Money.of(500, 'CZK'),

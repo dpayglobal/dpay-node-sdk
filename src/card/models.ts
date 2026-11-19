@@ -36,6 +36,12 @@ export interface CardPaymentResult {
   readonly threeDsFormHtml: string | null
   /** Decoded URL to send the payer to, when `requiresRedirect`. */
   readonly redirectUrl: string | null
+  /**
+   * Apple Pay merchant session from an APPLE_PAY_INIT call: `redirectType` FORM with the Base64-encoded
+   * ApplePayMerchantSession JSON in `redirectText`. Pass it to `completeMerchantValidation()` on the device.
+   * Null when the response does not carry a JSON object (for example a 3-D Secure form).
+   */
+  readonly applePayMerchantSession: Record<string, unknown> | null
   readonly dccOffer: DccOffer | null
   readonly raw: Record<string, unknown>
 }
@@ -56,6 +62,7 @@ export function parseCardPaymentResult(data: Record<string, unknown>): CardPayme
   const offer = record(message.dccOffer)
   const requiresThreeDsForm = redirectType === RedirectType.FORM
   const requiresRedirect = redirectType === RedirectType.URL
+  const threeDsFormHtml = requiresThreeDsForm && redirectText !== null ? decodeBase64(redirectText) : null
 
   return Object.freeze({
     redirectType,
@@ -64,8 +71,9 @@ export function parseCardPaymentResult(data: Record<string, unknown>): CardPayme
     requiresThreeDsForm,
     requiresRedirect,
     hasDccOffer: redirectType === RedirectType.DCC_OFFER,
-    threeDsFormHtml: requiresThreeDsForm && redirectText !== null ? decodeBase64(redirectText) : null,
+    threeDsFormHtml,
     redirectUrl: requiresRedirect && redirectText !== null ? decodeBase64(redirectText) : null,
+    applePayMerchantSession: threeDsFormHtml === null ? null : jsonObjectOrNull(threeDsFormHtml),
     dccOffer: offer === null ? null : parseDccOffer(offer),
     raw: data,
   })
@@ -106,6 +114,15 @@ function amount(data: Record<string, unknown>, amountKey: string, currencyKey: s
 function floatOrZero(data: Record<string, unknown>, key: string): number {
   const value = data[key] ?? 0
   return isNumeric(value) ? Number(value) : 0
+}
+
+/** Only a JSON object is a merchant session. */
+function jsonObjectOrNull(text: string): Record<string, unknown> | null {
+  try {
+    return record(JSON.parse(text))
+  } catch {
+    return null
+  }
 }
 
 function decodeBase64(text: string): string | null {

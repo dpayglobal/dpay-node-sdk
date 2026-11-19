@@ -3,6 +3,7 @@ import { Config } from '../../src/config.js'
 import { DPayValueError, PaymentRejectedError } from '../../src/errors.js'
 import { ApiRequestor } from '../../src/internal/requestor.js'
 import { Money } from '../../src/money.js'
+import { RegisteredTransactionStatus } from '../../src/payment/models.js'
 import { PaymentService } from '../../src/payment/service.js'
 import { MockHttpClient } from '../../src/testing.js'
 
@@ -70,5 +71,96 @@ describe('PaymentService.details', () => {
       '9508d77a17bdd44829ecc450214a3e356ca0cbe2f93c28012e3a5f6b39b4aa30',
     )
     expect(transaction.isPaid).toBe(true)
+  })
+})
+
+describe('PaymentService.register answers of 0.3.0', () => {
+  it('returns the already paid transaction of "Transaction paid" in the amount currency', async () => {
+    const { transport, payments } = build()
+    transport.queueJson(200, {
+      error: false,
+      msg: 'Transaction paid',
+      status: true,
+      transactionId: '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+      additionalInfo: {
+        transaction: {
+          payment_id: '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+          pid: null,
+          mtid: null,
+          email: 'client@example.com',
+          description: 'Zamowienie #1234',
+          name: 'Jan',
+          surname: 'Kowalski',
+          value: '10.00',
+          status: 'paid',
+          creation_date: '2026-11-18 10:00:00',
+          payment_date: '2026-11-18 10:01:00',
+        },
+      },
+    })
+    const payment = await payments.register({ amount: Money.pln(1000), transactionType: 'transfers', urls })
+    const transaction = payment.paidTransaction
+
+    expect(payment.isPaid).toBe(true)
+    expect(payment.multibanco).toBeNull()
+    expect(transaction?.paymentId).toBe('30D9493D-1D73-3FBD-A5D4-633723CC7A68')
+    expect(transaction?.status).toBe(RegisteredTransactionStatus.PAID)
+    expect(transaction?.isPaid).toBe(true)
+    expect(transaction?.value?.equals(Money.pln(1000))).toBe(true)
+    expect(transaction?.email).toBe('client@example.com')
+    expect(transaction?.description).toBe('Zamowienie #1234')
+    expect(transaction?.name).toBe('Jan')
+    expect(transaction?.surname).toBe('Kowalski')
+    expect(transaction?.pid).toBeNull()
+    expect(transaction?.mtid).toBeNull()
+    expect(transaction?.creationDate).toBe('2026-11-18 10:00:00')
+    expect(transaction?.paymentDate).toBe('2026-11-18 10:01:00')
+
+    transport.queueJson(200, {
+      msg: 'Transaction paid',
+      additionalInfo: { transaction: { value: 12.5, status: 'pending' } },
+    })
+    const euro = await payments.register({
+      amount: Money.of(1250, 'EUR'),
+      transactionType: 'transfers',
+      urls,
+    })
+    expect(euro.paidTransaction?.value?.equals(Money.of(1250, 'EUR'))).toBe(true)
+    expect(euro.paidTransaction?.isPaid).toBe(false)
+    expect(euro.paidTransaction?.paymentId).toBe('')
+  })
+
+  it('returns the Multibanco reference', async () => {
+    const { transport, payments } = build()
+    transport.queueJson(200, {
+      error: false,
+      msg: 'https://secure.dpay.pl/transfer@pay@ABC',
+      status: true,
+      transactionId: 'ABC',
+      multibanco: {
+        entity: '12345',
+        reference: '123456789',
+        amount: '12.50',
+        currency: 'EUR',
+        expires_at: '2026-11-21T10:00:00+00:00',
+      },
+    })
+    const payment = await payments.register({
+      amount: Money.of(1250, 'EUR'),
+      transactionType: 'transfers',
+      urls: { success: 'https://shop.example/ok', fail: 'https://shop.example/fail' },
+      channel: '390',
+      payer: { email: 'client@example.com', firstName: 'Joao', lastName: 'Silva' },
+      acceptTos: true,
+    })
+    const multibanco = payment.multibanco
+
+    expect(transport.lastRequestBody.currency_code).toBe('EUR')
+    expect(payment.paidTransaction).toBeNull()
+    expect(multibanco?.entity).toBe('12345')
+    expect(multibanco?.reference).toBe('123456789')
+    expect(multibanco?.amount?.equals(Money.of(1250, 'EUR'))).toBe(true)
+    expect(multibanco?.currency).toBe('EUR')
+    expect(multibanco?.expiresAt).toBe('2026-11-21T10:00:00+00:00')
   })
 })

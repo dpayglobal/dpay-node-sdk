@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Config } from '../../src/config.js'
 import { InvalidRequestError } from '../../src/errors.js'
 import { ApiRequestor } from '../../src/internal/requestor.js'
-import { RecurringAliasStatus } from '../../src/recurring/enums.js'
+import { RecurringAliasStatus, RetryRefusal } from '../../src/recurring/enums.js'
 import { parseRecurringRetryResult, parseRecurringStatus } from '../../src/recurring/models.js'
 import { RecurringService } from '../../src/recurring/service.js'
 import { MockHttpClient } from '../../src/testing.js'
@@ -133,6 +133,7 @@ describe('RecurringService.retry', () => {
       checksum: '00bceec5fca2ee4c3a1737156df376441d225790eb61ca47fcbe9cba7243a77d',
     })
     expect(result.isPending).toBe(true)
+    expect(result.isSuccess).toBe(false)
     expect(result.isFailed).toBe(false)
     expect(result.count).toBe(1)
     expect(result.transactionId).toBe(TRANSACTION_ID)
@@ -167,7 +168,24 @@ describe('RecurringService.retry', () => {
 
     expect(error).toBeInstanceOf(InvalidRequestError)
     expect(error.httpStatus).toBe(400)
-    expect(error.fieldErrors.retry).toEqual(['DECLINE_NOT_RETRYABLE'])
+    expect(error.fieldErrors.retry).toEqual([RetryRefusal.DECLINE_NOT_RETRYABLE])
+    expect(error.fieldErrors.decline_reason).toEqual(['SEC_DECLINED'])
+  })
+
+  it('reports a retry that succeeded at once', async () => {
+    const { transport, recurring } = build()
+    transport.queueJson(200, {
+      status: 'success',
+      data: { transactionId: TRANSACTION_ID, retry: { status: 'success', count: 1 } },
+    })
+
+    const result = await recurring.retry(TRANSACTION_ID)
+
+    expect(result.isSuccess).toBe(true)
+    expect(result.isPending).toBe(false)
+    expect(result.isFailed).toBe(false)
+    expect(Object.values(RetryRefusal)).toHaveLength(8)
+    expect(RetryRefusal.SERVICE_UNAVAILABLE).toBe('Service unavailable')
   })
 
   it('stringifies a scalar transaction id and ignores a malformed retry block', () => {

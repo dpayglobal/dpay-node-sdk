@@ -3,7 +3,7 @@ import { serializeBlikAliasRegistration } from '../blik/params.js'
 import { type CardRecurringOperation, assertCardRecurringOperation } from '../card/enums.js'
 import type { CardRecurringRegistrationParams } from '../card/recurring-params.js'
 import { serializeCardRecurringRegistration } from '../card/recurring-params.js'
-import { assertCurrency } from '../currency.js'
+import { Currency, assertCurrency } from '../currency.js'
 import { DPayValueError } from '../errors.js'
 import { phpMbStrlen, phpStrlen, phpTrim } from '../internal/php.js'
 import { hasControlCharacters, isValidEmail, isValidIp, isValidUrl } from '../internal/validation.js'
@@ -24,6 +24,8 @@ import { serializeDeviceInfo, serializeInvoice, serializePayoutInstruction } fro
 
 const PARTNER_PLATFORM = /^[A-Z0-9]{1,64}$/
 const BLIK_CODE = /^\d{6}$/
+/** Channels the API refuses as a direct `channel`. */
+const FORBIDDEN_CHANNELS = ['tester', 'paypal', 'installment', 'paysafecard']
 
 /** Everything `payments.register` accepts. Only the first three fields are required. */
 export interface RegisterPaymentParams {
@@ -37,8 +39,13 @@ export interface RegisterPaymentParams {
   /** Opaque merchant reference, echoed back in the IPN. */
   custom?: string
   payer?: PayerParams
+  /** Required with a direct `channel`; `false` is sent as `false`. */
   acceptTos?: boolean
-  /** Payment channel identifier from panel.dpay.pl. */
+  /**
+   * Direct payment channel (bank or method ID, for example `373` for MB WAY), skipping the dpay gateway. A channel
+   * requires the payer's email and name (`payer`) and `acceptTos`; it cannot be `tester`, `paypal`, `installment`
+   * or `paysafecard`. An empty string is sent as before 0.3.0 and means no channel (the API turns it into null).
+   */
   channel?: string
   creditCard?: boolean
   paysafecard?: boolean
@@ -47,8 +54,14 @@ export interface RegisterPaymentParams {
   paypal?: boolean
   /** Hides the bank list on the payment page. */
   noBanks?: boolean
-  /** Requires `currencyCode` to be set as well. */
+  /**
+   * Payer's phone (MB WAY `+351...`), 9 to 15 characters. Requires `currencyCode` to be set as well.
+   */
   phoneNumber?: string
+  /**
+   * Sends `currency_code` explicitly. Optional since 0.3.0: an amount in a currency other than PLN sends its
+   * currency on its own. Must be the currency of the amount (`Money.of(500, Currency.EUR)`).
+   */
   currencyCode?: string
   /** Uppercase letters and digits, up to 64 characters. */
   partnerPlatform?: string
@@ -78,6 +91,7 @@ export interface RegisterPaymentParams {
    * to that customer.
    */
   recurringAlias?: string
+  /** Address of `alias_update` notifications (BLIK OneClick and recurring payments), at most 500 characters. */
   aliasIpnUrl?: string
   noDelay?: boolean
   /** Cannot be combined with `cardRecurringAlias`. */
@@ -89,9 +103,13 @@ export interface RegisterPaymentParams {
   payout?: PayoutInstructionParams
   billingAddress?: Record<string, unknown>
   shippingAddress?: Record<string, unknown>
+  /** Required with `browserJavaEnabled` for `mb_way_direct`. */
   deviceInfo?: DeviceInfoParams
   products?: ReadonlyArray<Record<string, unknown>>
-  /** Only valid when `transactionType` is `transfers`. */
+  /**
+   * Only valid when `transactionType` is `transfers`; cannot be combined with BLIK codes or aliases, recurring
+   * payments or card aliases.
+   */
   efaktura?: boolean
   invoice?: InvoiceParams
   /**
@@ -120,8 +138,11 @@ export interface RegisterPaymentParams {
  */
 export function buildRegisterBody(service: string, params: RegisterPaymentParams): Record<string, unknown> {
   assertTransactionType(params.transactionType)
+  assertFieldRules(params)
   assertExclusions(params)
   assertRecurringCombination(params)
+  assertDirectChannel(params)
+  assertEfakturaCombination(params)
 
   const body: Record<string, unknown> = {
     service,
@@ -158,10 +179,10 @@ export function buildRegisterBody(service: string, params: RegisterPaymentParams
   }
 
   if (params.phoneNumber !== undefined) body.phone_number = params.phoneNumber
-  if (params.currencyCode !== undefined) {
-    assertCurrency(params.currencyCode)
-    body.currency_code = params.currencyCode
-  }
+  // The API registers an amount without currency_code in PLN
+  const currencyCode =
+    params.currencyCode ?? (params.amount.currency !== Currency.PLN ? params.amount.currency : undefined)
+  if (currencyCode !== undefined) body.currency_code = currencyCode
   if (params.partnerPlatform !== undefined) {
     if (!PARTNER_PLATFORM.test(params.partnerPlatform)) {
       throw new DPayValueError('Partner platform must match ^[A-Z0-9]{1,64}$')
@@ -182,12 +203,7 @@ export function buildRegisterBody(service: string, params: RegisterPaymentParams
     body.recurring_registration = serializeRecurringRegistration(params.recurringRegistration)
   }
   if (params.recurringAlias !== undefined) body.recurring_alias = params.recurringAlias
-  if (params.aliasIpnUrl !== undefined) {
-    if (!isValidUrl(params.aliasIpnUrl)) {
-      throw new DPayValueError(`Invalid alias IPN URL "${params.aliasIpnUrl}"`)
-    }
-    body.alias_ipn_url = params.aliasIpnUrl
-  }
+  if (params.aliasIpnUrl !== undefined) body.alias_ipn_url = params.aliasIpnUrl
   if (params.noDelay !== undefined) body.no_delay = params.noDelay
   if (params.registerCardRecurring !== undefined) {
     body.register_card_recurring = serializeCardRecurringRegistration(params.registerCardRecurring)
@@ -215,6 +231,75 @@ export function buildRegisterBody(service: string, params: RegisterPaymentParams
   if (params.reference !== undefined) body.reference = normalizeReference(params.reference)
 
   return body
+}
+
+/** The checks the PHP SDK runs in its setters: channel, phone, currency and alias IPN URL. */
+function assertFieldRules(params: RegisterPaymentParams): void {
+  if (params.channel !== undefined && FORBIDDEN_CHANNELS.includes(params.channel)) {
+    throw new DPayValueError(`Channel "${params.channel}" cannot be used as a direct payment channel`)
+  }
+  if (params.phoneNumber !== undefined) {
+    const length = phpMbStrlen(params.phoneNumber)
+    if (length < 9 || length > 15) throw new DPayValueError('Phone number must be 9-15 characters')
+  }
+  if (params.currencyCode !== undefined) {
+    assertCurrency(params.currencyCode)
+    if (params.currencyCode !== params.amount.currency) {
+      throw new DPayValueError(
+        `Currency code "${params.currencyCode}" does not match the amount currency "${params.amount.currency}" - ` +
+          `create the amount with Money.of(..., "${params.currencyCode}")`,
+      )
+    }
+  }
+  if (
+    params.aliasIpnUrl !== undefined &&
+    (phpMbStrlen(params.aliasIpnUrl) > 500 || !isValidUrl(params.aliasIpnUrl))
+  ) {
+    throw new DPayValueError(`Invalid alias IPN URL "${params.aliasIpnUrl}"`)
+  }
+}
+
+/**
+ * MB WAY (`mb_way_direct`) needs a channel (`373`) and the device info with `browserJavaEnabled`; any direct
+ * channel needs the payer's email, name and the terms acceptance - otherwise the API answers 422. An empty
+ * channel means no channel (the API turns it into null).
+ */
+function assertDirectChannel(params: RegisterPaymentParams): void {
+  const hasChannel = params.channel !== undefined && params.channel !== ''
+  if (params.transactionType === TransactionType.MB_WAY_DIRECT) {
+    if (!hasChannel) {
+      throw new DPayValueError('transactionType "mb_way_direct" requires a channel (channel: "373")')
+    }
+    if (params.deviceInfo?.browserJavaEnabled === undefined) {
+      throw new DPayValueError(
+        'transactionType "mb_way_direct" requires device info with browserJavaEnabled (deviceInfo)',
+      )
+    }
+  }
+  if (!hasChannel) return
+  const payer = params.payer
+  if (payer?.email === undefined || (payer.firstName ?? '') === '' || (payer.lastName ?? '') === '') {
+    throw new DPayValueError("A direct channel requires the payer's email, first name and last name (payer)")
+  }
+  if (params.acceptTos === undefined) {
+    throw new DPayValueError('A direct channel requires the terms acceptance (acceptTos)')
+  }
+}
+
+function assertEfakturaCombination(params: RegisterPaymentParams): void {
+  if (params.efaktura !== true) return
+  const conflicts: Array<[string, unknown]> = [
+    ['blik_code', params.blikCode],
+    ['blik_alias', params.blikAlias],
+    ['register_blik_alias', params.registerBlikAlias],
+    ['recurring_registration', params.recurringRegistration],
+    ['recurring_alias', params.recurringAlias],
+    ['register_card_recurring', params.registerCardRecurring],
+    ['card_recurring_alias', params.cardRecurringAlias],
+  ]
+  for (const [field, value] of conflicts) {
+    if (value !== undefined) throw new DPayValueError(`efaktura cannot be combined with ${field}`)
+  }
 }
 
 function assertExclusions(params: RegisterPaymentParams): void {
@@ -281,7 +366,8 @@ function assertRecurringCombination(params: RegisterPaymentParams): void {
     ['card_recurring_alias', params.cardRecurringAlias],
   ]
   if (registration) {
-    conflicts.push(['channel', params.channel])
+    // An empty channel means no channel
+    conflicts.push(['channel', params.channel === '' ? undefined : params.channel])
     if (params.blikCode === undefined) {
       throw new DPayValueError("recurring_registration requires the customer's BLIK code (blikCode)")
     }

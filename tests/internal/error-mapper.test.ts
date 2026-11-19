@@ -15,6 +15,67 @@ const json = (status: number, body: unknown, headers: Record<string, string> = {
   new ApiResponse(status, headers, JSON.stringify(body))
 
 describe('mapError', () => {
+  it('reads X-RateLimit-Reset of a 429', () => {
+    const error = mapError(
+      json(
+        429,
+        { message: 'Too Many Attempts.' },
+        {
+          'retry-after': '12',
+          'x-ratelimit-limit': '60',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': '1790503560',
+        },
+      ),
+    ) as RateLimitError
+    expect(error).toBeInstanceOf(RateLimitError)
+    expect(error.retryAfter).toBe(12)
+    expect(error.limit).toBe(60)
+    expect(error.remaining).toBe(0)
+    expect(error.reset).toBe(1790503560)
+    expect((mapError(json(429, {})) as RateLimitError).reset).toBeNull()
+  })
+
+  it('carries the transaction id and the card decline of a Payments API error', () => {
+    const error = mapError(
+      new ApiResponse(
+        400,
+        {},
+        '{"status":"failed","message":"Card payment declined","errors":{},"transactionId":"A75AEBB4-4B89-4834-AD43-EF442C133769",' +
+          '"cardError":{"code":"payment_declined","declineCode":"51","declineMessage":"Insufficient funds or over credit limit"}}',
+      ),
+    )
+    expect(error).toBeInstanceOf(InvalidRequestError)
+    expect(error.transactionId).toBe('A75AEBB4-4B89-4834-AD43-EF442C133769')
+    expect(error.cardError).toEqual({
+      code: 'payment_declined',
+      declineCode: '51',
+      declineMessage: 'Insufficient funds or over credit limit',
+    })
+  })
+
+  it('keeps the null fields of a card error', () => {
+    const error = mapError(
+      json(400, {
+        status: 'failed',
+        message: 'Declined',
+        cardError: { code: 'payment_declined', declineCode: null, declineMessage: null },
+      }),
+    )
+    expect(error.cardError).toEqual({ code: 'payment_declined', declineCode: null, declineMessage: null })
+    expect(mapError(json(400, { cardError: { declineCode: 51 } })).cardError?.declineCode).toBe('51')
+  })
+
+  it('has no transaction context when the body carries none', () => {
+    const error = mapError(json(400, { status: 'failed', message: 'Invalid checksum', errors: {} }))
+    expect(error.transactionId).toBeNull()
+    expect(error.cardError).toBeNull()
+    expect(mapError(json(500, { transactionId: '' })).transactionId).toBeNull()
+    expect(mapError(json(500, { transactionId: 42, cardError: 'x' })).transactionId).toBeNull()
+    expect(mapError(json(404, { transactionId: 'T-1' })).transactionId).toBe('T-1')
+    expect(mapError(json(429, { transactionId: 'T-1' })).transactionId).toBeNull()
+  })
+
   it('maps every status to its class', () => {
     expect(mapError(json(401, {}))).toBeInstanceOf(AuthenticationError)
     expect(mapError(json(400, {}))).toBeInstanceOf(InvalidRequestError)

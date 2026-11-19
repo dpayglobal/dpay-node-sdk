@@ -4,10 +4,13 @@ import { isNumeric, isScalar, phpStrval } from '../internal/php.js'
 import { type IpnEvent, IpnType, buildIpnEvent } from './event.js'
 
 const REQUIRED = ['id', 'amount', 'type', 'attempt', 'version', 'signature']
+const REQUIRED_ALIAS_UPDATE = ['id', 'type', 'version', 'signature']
 
 /**
- * Parses and verifies an IPN body. Always pass the exact bytes dpay sent -
- * a re-serialized JSON object will not verify.
+ * Parses and verifies an IPN body (JSON POST, acknowledged with the body `OK`). Always pass the exact bytes dpay
+ * sent - a re-serialized JSON object will not verify.
+ *  - transfer, dcb: sha256(id . secretHash . amount . email . type . attempt . version . custom), dcb without email;
+ *  - alias_update: sha256(id . secretHash . type . version).
  */
 export function constructIpnEvent(rawBody: string | Uint8Array, secretHash: string): IpnEvent {
   const text = typeof rawBody === 'string' ? rawBody : Buffer.from(rawBody).toString('utf8')
@@ -23,14 +26,15 @@ export function constructIpnEvent(rawBody: string | Uint8Array, secretHash: stri
   }
 
   const raw = payload as Record<string, unknown>
-  for (const field of REQUIRED) {
+  const type = isScalar(raw.type) ? phpStrval(raw.type) : ''
+  for (const field of type === IpnType.ALIAS_UPDATE ? REQUIRED_ALIAS_UPDATE : REQUIRED) {
     if (raw[field] === undefined || raw[field] === null) {
       throw new SignatureVerificationError('Invalid IPN payload')
     }
   }
   if (typeof raw.signature !== 'string') throw new SignatureVerificationError('Invalid IPN payload')
 
-  const expected = expectedSignature(raw, secretHash)
+  const expected = expectedSignature(raw, type, secretHash)
   const provided = Buffer.from(raw.signature, 'utf8')
   const wanted = Buffer.from(expected, 'utf8')
   if (provided.length !== wanted.length || !timingSafeEqual(provided, wanted)) {
@@ -40,17 +44,19 @@ export function constructIpnEvent(rawBody: string | Uint8Array, secretHash: stri
   return buildIpnEvent(raw)
 }
 
-function expectedSignature(raw: Record<string, unknown>, secretHash: string): string {
-  const type = isScalar(raw.type) ? phpStrval(raw.type) : ''
-  const parts = [
-    isScalar(raw.id) ? phpStrval(raw.id) : '',
-    secretHash,
-    isScalar(raw.amount) ? phpStrval(raw.amount) : '',
-  ]
-  if (type !== IpnType.DCB) parts.push(isScalar(raw.email) ? phpStrval(raw.email) : '')
-  parts.push(type)
-  parts.push(isNumeric(raw.attempt) ? phpStrval(raw.attempt) : '0')
-  parts.push(isNumeric(raw.version) ? phpStrval(raw.version) : '0')
-  parts.push(isScalar(raw.custom) ? phpStrval(raw.custom) : '')
+function expectedSignature(raw: Record<string, unknown>, type: string, secretHash: string): string {
+  const id = isScalar(raw.id) ? phpStrval(raw.id) : ''
+  const version = isNumeric(raw.version) ? phpStrval(raw.version) : '0'
+  let parts: string[]
+  if (type === IpnType.ALIAS_UPDATE) {
+    parts = [id, secretHash, type, version]
+  } else {
+    parts = [id, secretHash, isScalar(raw.amount) ? phpStrval(raw.amount) : '']
+    if (type !== IpnType.DCB) parts.push(isScalar(raw.email) ? phpStrval(raw.email) : '')
+    parts.push(type)
+    parts.push(isNumeric(raw.attempt) ? phpStrval(raw.attempt) : '0')
+    parts.push(version)
+    parts.push(isScalar(raw.custom) ? phpStrval(raw.custom) : '')
+  }
   return createHash('sha256').update(parts.join(''), 'utf8').digest('hex')
 }

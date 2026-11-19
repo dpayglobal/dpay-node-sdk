@@ -26,8 +26,26 @@ export type RecurringAliasStatus = (typeof RecurringAliasStatus)[keyof typeof Re
 
 /**
  * Outcome of retrying a declined charge: `pending` - the retry went to the bank, the result comes like for a
- * charge; `failed` - the bank declined it at once.
+ * charge; `success` - it succeeded at once; `failed` - the bank declined it at once.
  */
 export const RecurringRetryStatus = { PENDING: 'pending', FAILED: 'failed', SUCCESS: 'success' } as const
 
 export type RecurringRetryStatus = (typeof RecurringRetryStatus)[keyof typeof RecurringRetryStatus]
+
+/**
+ * Why `recurring.retry()` was refused (HTTP 400, nothing sent to BLIK): the `InvalidRequestError` field error
+ * `retry` - `fieldErrors.retry[0]`. With `DECLINE_NOT_RETRYABLE` the decline code is in
+ * `fieldErrors.decline_reason[0]`.
+ */
+export const RetryRefusal = {
+  PAYMENT_NOT_DECLINED: 'PAYMENT_NOT_DECLINED',
+  DECLINE_NOT_RETRYABLE: 'DECLINE_NOT_RETRYABLE',
+  RETRY_LIMIT_REACHED: 'RETRY_LIMIT_REACHED',
+  RETRY_WINDOW_EXPIRED: 'RETRY_WINDOW_EXPIRED',
+  ALIAS_NOT_AVAILABLE: 'ALIAS_NOT_AVAILABLE',
+  RECURRING_NOT_ENABLED: 'RECURRING_NOT_ENABLED',
+  PAYMENT_NOT_FOUND: 'PAYMENT_NOT_FOUND',
+  SERVICE_UNAVAILABLE: 'Service unavailable',
+} as const
+
+export type RetryRefusal = (typeof RetryRefusal)[keyof typeof RetryRefusal]

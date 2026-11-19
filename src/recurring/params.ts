@@ -10,7 +10,7 @@ const FREQUENCY = /^[1-9][0-9]{0,2}[DWMY]$/
  * that carries the customer's BLIK code. See `RecurringModel` for what each model requires.
  */
 export interface RecurringRegistrationParams {
-  /** 1 to 50 characters, shown to the customer. */
+  /** 1 to 35 characters (BLIK limit), shown to the customer. */
   label: string
   model: RecurringModel | (string & {})
   /** The merchant's terms the customer accepted (consent evidence). Valid URL, at most 2048 characters. */
@@ -41,8 +41,8 @@ export interface RecurringRegistrationParams {
  * terms_version`. Validates every field and the model rules. Throws DPayValueError if validation fails.
  */
 export function serializeRecurringRegistration(params: RecurringRegistrationParams): Record<string, unknown> {
-  if (params.label === '' || phpMbStrlen(params.label) > 50) {
-    throw new DPayValueError('Recurring payment label must be 1-50 characters')
+  if (params.label === '' || phpMbStrlen(params.label) > 35) {
+    throw new DPayValueError('Recurring payment label must be 1-35 characters')
   }
   if (!(Object.values(RecurringModel) as string[]).includes(params.model)) {
     throw new DPayValueError(`Invalid recurring model "${params.model}"`)
