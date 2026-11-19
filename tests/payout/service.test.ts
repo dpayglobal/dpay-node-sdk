@@ -207,7 +207,8 @@ describe('PayoutService.list', () => {
     expect(page.items).toHaveLength(1)
     expect(item?.id).toBe(7)
     expect(item?.isFailed).toBe(true)
-    expect(item?.isDeclined).toBe(true)
+    // Only the JSON integer 1 is a set flag
+    expect(item?.isDeclined).toBe(false)
     expect(item?.type).toBeNull()
     expect(item?.net.equals(Money.pln(0))).toBe(true)
     expect(item?.exportDate).toBeNull()
@@ -224,10 +225,67 @@ describe('PayoutService.list', () => {
     [{ perPage: 201 }, 'per_page must be between 1 and 200'],
     [{ perPage: 0 }, 'per_page must be between 1 and 200'],
     [{ status: 1 }, 'Unknown payout filter "status"'],
+    [{ dateFrom: 20260801 }, 'date_from must be a string'],
+    [{ dateTo: new Date('2026-08-31') }, 'date_to must be a string'],
+    [{ dateFrom: ' \n' }, 'date_from must not be empty'],
+    [{ dateTo: '\u3000\u200b' }, 'date_to must not be empty'],
+    [{ state: '1' }, 'state must be an integer'],
+    [{ state: true }, 'state must be an integer'],
+    [{ state: 0.5 }, 'state must be an integer'],
+    [{ type: 1 }, 'type must be a string'],
+    [{ status: 1, dateFrom: 5 }, 'Unknown payout filter "status"'],
+    [{ dateFrom: 5, dateTo: 5 }, 'date_from must be a string'],
+    [{ dateTo: ' ', state: '1' }, 'date_to must not be empty'],
+    [{ state: '1', type: 1 }, 'state must be an integer'],
+    [{ type: 1, page: 0 }, 'type must be a string'],
   ] as Array<[Record<string, unknown>, string]>)('validates %o', async (params, message) => {
     const { transport, payouts } = buildMyShop()
-    await expect(payouts.list(params as ListPayoutsParams)).rejects.toThrow(message)
+    await expect(payouts.list(params as ListPayoutsParams)).rejects.toThrow(new DPayValueError(message))
     await expect(payouts.list(params as ListPayoutsParams)).rejects.toBeInstanceOf(DPayValueError)
+    expect(transport.requests).toHaveLength(0)
+  })
+
+  it('sends and signs the dates trimmed like the API, Unicode spaces and invisible characters included', async () => {
+    const { transport, payouts } = buildMyShop()
+    transport.queueJson(200, EMPTY_PAGE)
+    await payouts.list({ dateFrom: '\ufeff2026-08-01 ', dateTo: '\u30002026-08-31 23:59:59\u200b' })
+    expect(transport.lastRequestBody).toEqual({
+      service: 'MyShop',
+      date_from: '2026-08-01',
+      date_to: '2026-08-31 23:59:59',
+      checksum: '59828763de9628f5794f01750e9876aba13876caac856f62daf7840552f28d6f',
+    })
+  })
+
+  it('trims the service of every payout request', async () => {
+    const { transport, payouts } = buildMyShop(' MyShop\u00a0')
+    transport.queueJson(200, EMPTY_PAGE)
+    await payouts.list()
+    expect(transport.lastRequestBody).toEqual({ service: 'MyShop', checksum: sha256('MyShop|secret123') })
+    transport.queueJson(200, {})
+    await payouts.details({ withdrawId: 4242 })
+    expect(transport.lastRequestBody).toEqual({
+      service: 'MyShop',
+      withdraw_id: 4242,
+      checksum: sha256('MyShop|4242|secret123'),
+    })
+    transport.queueJson(200, {})
+    await payouts.detailsFull({ withdrawId: 4242 })
+    expect(transport.lastRequestBody.service).toBe('MyShop')
+    expect(transport.lastRequestBody.checksum).toBe(sha256('MyShop|4242|secret123'))
+  })
+
+  it('checks the service before the filters', async () => {
+    const { transport, payouts } = buildMyShop('\u200b')
+    await expect(payouts.list({ status: 1 } as unknown as ListPayoutsParams)).rejects.toThrow(
+      new DPayValueError('service must not be empty'),
+    )
+    await expect(payouts.details({ withdrawId: 1 })).rejects.toThrow(
+      new DPayValueError('service must not be empty'),
+    )
+    await expect(payouts.detailsFull({ withdrawId: 1 })).rejects.toThrow(
+      new DPayValueError('service must not be empty'),
+    )
     expect(transport.requests).toHaveLength(0)
   })
 
@@ -410,6 +468,35 @@ describe('PayoutService.detailsFull', () => {
     expect(settlement.summaryCount).toBe(0)
     expect(settlement.positions).toEqual([])
     expect(settlement.meta.page).toBe(1)
+  })
+})
+
+describe('payout flags are true only for the JSON integer 1', () => {
+  it.each([
+    [1, true],
+    [0, false],
+    ['1', false],
+    ['1abc', false],
+    [true, false],
+    [2, false],
+    [null, false],
+    [undefined, false],
+  ] as Array<[unknown, boolean]>)('%j -> %s', async (value, expected) => {
+    const { transport, payouts } = buildMyShop()
+    transport.queueJson(200, { id: 1, paysafecard: value, direct_settlement: value, declined: value })
+    const details = await payouts.details({ withdrawId: 1 })
+    expect(details.isPaysafecard).toBe(expected)
+    expect(details.isDirectSettlement).toBe(expected)
+    expect(details.isDeclined).toBe(expected)
+    transport.queueJson(200, { withdraws: [{ id: 1, declined: value }] })
+    const [item] = (await payouts.list()).items
+    expect(item?.isDeclined).toBe(expected)
+  })
+
+  it('reads a decoded 1.0 like 1, since JSON.parse does not tell them apart', async () => {
+    const { transport, payouts } = buildMyShop()
+    transport.queueText(200, '{"id":1,"declined":1.0}', { 'content-type': 'application/json' })
+    expect((await payouts.details({ withdrawId: 1 })).isDeclined).toBe(true)
   })
 })
 

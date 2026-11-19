@@ -10,15 +10,16 @@ wersjonowanie zgodne z [SemVer](https://semver.org/lang/pl/).
 
 Wersja dogania dokumentację API dpay (OpenAPI 1.6.0) i działa z obecnym API - nie wymaga nowego wydania API.
 Parytet z SDK PHP `0.3.0`: wspólne wektory `tests/fixtures/api_vectors.json` (9 sum `ordered_body`, 3 podpisy
-IPN), golden 29/29 żądań bajtowo identycznych (body rejestracji w CZK z `currency_code` sprawdzone SDK PHP 0.3.0),
+IPN, 8 łańcuchów i 4 body `server_trim`), golden 29/29 żądań bajtowo identycznych (body rejestracji w CZK z `currency_code` sprawdzone SDK PHP 0.3.0),
 592/592 wartości odpowiedzi zgodne.
 
 ### Breaking
 
 - **BREAKING** `refunds.checkAvailability()` zwraca `RefundAvailability` (niedostępny) zamiast rzucać błąd
   dla każdej odpowiedzi 4xx z kluczem `refund`, w tym 404 (transakcja nie istnieje, wcześniej `NotFoundError`)
-  i 423 (zwrot przez BOK dpay). Przyczynę rozróżnia `httpStatus`. Nadal rzucają: 401 "Unauthorized request"
-  (`AuthenticationError`), 422, 429 i 5xx.
+  i 423 (zwrot przez BOK dpay). Przyczynę rozróżnia `httpStatus`. Rozstrzyga treść odpowiedzi, nie lista kodów.
+  Nadal rzucają: 401 "Unauthorized request" (`AuthenticationError`), każda odpowiedź bez klucza `refund` - tak API
+  odpowiada na 422 (walidacja) i 429 (limit zapytań) - oraz każde 5xx.
 - **BREAKING** Waluta kwoty trafia do `currency_code`: `Money` w walucie innej niż PLN wysyła `currency_code`
   bez `currencyCode` (wcześniej np. `Money.of(49900, 'CZK')` rejestrowało 499.00 w walucie domyślnej serwisu).
   `currencyCode` (także obok `phoneNumber`) rzuca `DPayValueError`, gdy waluta różni się od waluty kwoty - dla
@@ -39,10 +40,11 @@ IPN), golden 29/29 żądań bajtowo identycznych (body rejestracji w CZK z `curr
   karty oraz `ApiError.cardError` i `ApiError.transactionId` z pól `cardError` i `transactionId` błędu Payments
   API (np. odrzucone pobranie na zapisanej karcie).
 - `dpay.payouts.list()` i `iterate()` (`POST /api/v1/pbl/withdraws`, filtry `dateFrom`, `dateTo`, `state`, `type`,
-  strony do 200) oraz `detailsFull()` (`POST /api/v1/pbl/withdraws/details/full`: nagłówek, sumy całego
+  strony do 200; nieznany filtr lub wartość złego typu rzuca `DPayValueError`) oraz `detailsFull()` (`POST /api/v1/pbl/withdraws/details/full`: nagłówek, sumy całego
   rozliczenia i pozycje z `paymentId`, `custom`, `ipksef`, strony do 500); typy `PayoutPage`, `PayoutListItem`,
   `PayoutSettlement`, `SettlementPosition`, `PageMeta` i stałe `PayoutState`, `PayoutType`.
-- `PayoutDetails.currency` (z `currency_code`, PLN gdy go brak), `exportDate` i `isPaysafecard`.
+- `PayoutDetails.currency` (z `currency_code`, PLN gdy go brak), `exportDate` i `isPaysafecard` (prawda tylko
+  dla liczby całkowitej JSON `1`, jak `PayoutListItem.isDeclined`).
 - `refunds.create({ messageId })` - nagłówek `DigitalPayments-PSP-Message-ID` (tytuł przelewu
   `dpay.pl zwrot {messageId}`, poza sumą kontrolną), stała `REFUND_MESSAGE_ID_HEADER`.
 - `RegisteredPayment.multibanco` (`MultibancoReference`: encja, referencja, kwota, ważność) i `paidTransaction`
@@ -57,7 +59,8 @@ IPN), golden 29/29 żądań bajtowo identycznych (body rejestracji w CZK z `curr
 - `ApplePayParams.email` i `CardPaymentResult.applePayMerchantSession` (sesja ApplePayMerchantSession
   z `redirectText` odpowiedzi APPLE_PAY_INIT).
 - `RateLimitError.reset` (nagłówek `X-RateLimit-Reset`), `Currency.USD` i `Currency.RON`, `isValidPolishIban()`.
-- `tests/fixtures/api_vectors.json`: wektory IPN transfer, dcb i alias_update oraz sum list i szczegółów wypłat.
+- `tests/fixtures/api_vectors.json`: wektory IPN transfer, dcb i alias_update, sum list i szczegółów wypłat
+  oraz `server_trim` (przycinanie łańcuchów przez API panelu: wejście, wysłane body, suma kontrolna).
 
 ### Changed
 
@@ -73,8 +76,23 @@ IPN), golden 29/29 żądań bajtowo identycznych (body rejestracji w CZK z `curr
   - pozycja wypłaty (`payout.positions`): IBAN `PL` + 26 cyfr z poprawną sumą kontrolną mod 97 (spacje i małe
     litery dozwolone) i kwota powyżej 0.
 - `ApiError.transactionId` przeniesione z `PaymentRejectedError` do klasy bazowej (bez zmiany zachowania).
-- Daty filtrów listy wypłat są wysyłane i podpisywane bez białych znaków na brzegach (API przycina je przed
-  sprawdzeniem sumy kontrolnej).
+- Pusty identyfikator transakcji w `refunds.create()`, `refunds.checkAvailability()` i `payments.details()`
+  rzuca `DPayValueError` (`transaction_id must not be empty`) zamiast wysyłać żądanie, które API odrzuca kodem
+  422; identyfikator, który nie jest łańcuchem, rzuca `DPayValueError` (`transaction_id must be a string`).
+
+### Fixed
+
+- Żądania API panelu (`/api/v1/pbl/*`: zwroty, `payments.details()`, `banks.forService()`, wypłaty) wysyłają
+  i podpisują każdy łańcuch przycięty tak jak API (globalne `TrimStrings` Laravel 13, `Str::trim()`: białe znaki
+  ASCII, NUL, spacje Unicode i znaki niewidoczne, np. U+00A0, U+200B, U+FEFF - 65 punktów kodowych, inny zbiór
+  niż `String.prototype.trim()`) - wcześniej identyfikator transakcji, powód zwrotu, adres webhooka zwrotu, nazwa
+  serwisu lub data filtra z takim znakiem na brzegu kończyły się 401 "Unauthorized request" (daty filtrów były
+  przycinane tylko z białych znaków ASCII). Powód, z którego nic nie zostaje, jest wysyłany jako `""` (API liczy go
+  jako pusty segment); pusta po przycięciu nazwa serwisu, identyfikator transakcji lub data filtra rzucają
+  `DPayValueError`. Żądania API płatności (`api-payments`) bez zmian.
+- `PayoutDetails.isDirectSettlement`, `isDeclined` i `PayoutListItem.isDeclined` są prawdziwe tylko dla liczby
+  całkowitej JSON `1` (tak wysyła API) - wcześniej także np. dla `"1"`, `"1abc"` czy `true`.
+- `refunds.create()` sprawdza zdarzenia webhooka przed identyfikatorem zwrotu (`messageId`), jak SDK PHP.
 
 ## [0.2.0] - wydanie razem z wdrożeniem API dpay
 

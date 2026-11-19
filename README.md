@@ -280,9 +280,14 @@ if (availability.isAvailable) {
 }
 ```
 
-`checkAvailability()` zwraca wynik (nie wyjątek) dla każdej odmowy biznesowej z kluczem `refund`: 400, 402,
-404 (transakcja nie istnieje), 406, 409, 410, 411, 423 i biznesowego 401 - przyczynę rozróżnia `httpStatus`.
-Błędna suma kontrolna (401 "Unauthorized request"), 422, 429 i 5xx rzucają wyjątek.
+`checkAvailability()` rozstrzyga po treści odpowiedzi, nie po liście kodów: HTTP 200 i każda odpowiedź 4xx
+z kluczem `refund` to wynik (nie wyjątek) - dziś odmowy biznesowe 400, 402, 404 (transakcja nie istnieje), 406,
+409, 410, 411, 423 i biznesowe 401; przyczynę rozróżnia `httpStatus`. Wyjątek rzucają: błędna suma kontrolna
+(401 "Unauthorized request"), każda odpowiedź bez klucza `refund` - tak API odpowiada na błędy walidacji (422)
+i limit zapytań (429) - oraz każde 5xx, także z kluczem `refund`.
+
+Identyfikator transakcji, powód i adres webhooka są wysyłane i podpisywane bez białych i niewidocznych znaków
+na brzegach - API panelu przycina je przed sprawdzeniem sumy kontrolnej (patrz [Białe znaki](#białe-znaki-w-api-panelu)).
 
 ## Szczegóły transakcji i banki
 
@@ -313,6 +318,19 @@ for await (const payout of dpay.payouts.iterate({ dateFrom: '2026-08-01', state:
 `list()` zwraca jedną stronę (`perPage` do 200), `detailsFull()` - sumy całego rozliczenia (`summaryNet`,
 `summaryCount`) i stronę pozycji (`perPage` do 500). Kwoty są w walucie wypłaty (`currency`). Pozycje wypłaty 1:1
 (`payout.positions`) wymagają polskiego IBAN z poprawną sumą kontrolną (`isValidPolishIban()`) i kwoty powyżej 0.
+Filtry `dateFrom` i `dateTo` to łańcuchy, `state` - liczba całkowita, `type` - łańcuch; wartość innego typu,
+nieznany filtr i pusta data rzucają `DPayValueError`. Flagi `isPaysafecard`, `isDirectSettlement` i `isDeclined`
+są prawdziwe tylko dla liczby `1` z API.
+
+### Białe znaki w API panelu
+
+API panelu (`refunds`, `payments.details()`, `banks.forService()`, `payouts`) przycina każdy łańcuch żądania
+przed sprawdzeniem sumy kontrolnej - spacje, tabulatory i znaki nowej linii, ale też spacje Unicode (np. U+00A0,
+U+3000) i znaki niewidoczne (np. U+200B, U+FEFF, U+0000). SDK wysyła i podpisuje te wartości (także nazwę serwisu)
+już przycięte, więc `' 2026-08-01\n'` trafia do API jako `'2026-08-01'`. Zbiór znaków jest inny niż
+w `String.prototype.trim()`, dlatego SDK nie korzysta z niego. Identyfikator transakcji, nazwa serwisu i daty,
+z których nic nie zostaje, rzucają `DPayValueError` (`transaction_id must not be empty`); powód zwrotu, z którego
+nic nie zostaje, jest wysyłany jako pusty.
 
 ## Karty S2S
 

@@ -1,11 +1,21 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { Config } from '../../src/config.js'
-import { ApiError, ApiServerError, AuthenticationError, NotFoundError } from '../../src/errors.js'
+import {
+  ApiError,
+  ApiServerError,
+  AuthenticationError,
+  DPayValueError,
+  InvalidRequestError,
+  NotFoundError,
+  RateLimitError,
+} from '../../src/errors.js'
 import { ApiRequestor } from '../../src/internal/requestor.js'
 import { Money } from '../../src/money.js'
 import { REFUND_MESSAGE_ID_HEADER } from '../../src/refund/ops.js'
 import { RefundService } from '../../src/refund/service.js'
 import { MockHttpClient } from '../../src/testing.js'
+import { WebhookTarget } from '../../src/webhook/target.js'
 
 const build = (): { transport: MockHttpClient; refunds: RefundService } => {
   const transport = new MockHttpClient()
@@ -87,6 +97,7 @@ describe('RefundService.create with a message ID', () => {
     ['empty', ''],
     ['spaces only', '   '],
     ['line break', 'RET\r\nX-Evil: 1'],
+    ['trailing newline', 'RET\n'],
     ['non-ascii', 'ZWROT-ŁÓDŹ'],
   ])('rejects a %s message ID before sending', async (_name, messageId) => {
     const { transport, refunds } = buildMyShop()
@@ -180,3 +191,148 @@ describe('RefundService.checkAvailability', () => {
     expect(error.httpStatus).toBe(200)
   })
 })
+
+describe('refunds and the panel API trim', () => {
+  const buildWith = (service = 'MyShop'): { transport: MockHttpClient; refunds: RefundService } => {
+    const transport = new MockHttpClient()
+    const config = Config.fromOptions({ service, secretHash: 'secret123', httpClient: transport })
+    return { transport, refunds: new RefundService(new ApiRequestor(config, transport)) }
+  }
+
+  it('sends and signs the service, transaction ID and reason trimmed like the API', async () => {
+    const { transport, refunds } = buildWith(' MyShop ')
+    transport.queueJson(200, { status: 'success', refund: true })
+    await refunds.create({
+      transactionId: ' 30D9493D-1D73-3FBD-A5D4-633723CC7A68\n',
+      amount: Money.pln(1500),
+      reason: '\u3000reklamacja\u200b',
+    })
+    expect(transport.lastRequestBody).toEqual({
+      service: 'MyShop',
+      transaction_id: '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+      value: '15.00',
+      reason: 'reklamacja',
+      checksum: '5c00684addf39fda89d3d6cff88abf26bb8173119056fd3012050422943c798a',
+    })
+    expect(transport.lastRequest.body).toContain('"transaction_id":"30D9493D-1D73-3FBD-A5D4-633723CC7A68"')
+  })
+
+  it('trims the webhook URL, which is part of the checksum', async () => {
+    const { transport, refunds } = buildWith()
+    transport.queueJson(200, { status: 'success', refund: true })
+    // The URL check accepts a trailing non-ASCII space (it is percent-encoded in a URL path)
+    const webhook = WebhookTarget.create('https://shop.example/webhooks/refunds\u00a0\u200b', [
+      'refund.succeeded',
+    ])
+    await refunds.create({ transactionId: 'TX-1', webhook })
+    expect(transport.lastRequestBody.webhook).toEqual({
+      url: 'https://shop.example/webhooks/refunds',
+      events: ['refund.succeeded'],
+    })
+    expect(transport.lastRequestBody.checksum).toBe(
+      sha256('MyShop|TX-1|https://shop.example/webhooks/refunds|refund.succeeded|secret123'),
+    )
+  })
+
+  it('sends a reason that is blank after trimming as "" and signs an empty segment', async () => {
+    const { transport, refunds } = buildWith()
+    transport.queueJson(200, { status: 'success', refund: true })
+    await refunds.checkAvailability({
+      transactionId: '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+      amount: Money.pln(1500),
+      reason: '\ufeff \n',
+    })
+    expect(Object.keys(transport.lastRequestBody)).toEqual([
+      'service',
+      'transaction_id',
+      'value',
+      'reason',
+      'checksum',
+    ])
+    expect(transport.lastRequestBody.reason).toBe('')
+    expect(transport.lastRequestBody.checksum).toBe(
+      '12dcb016aa2302bbe8ea71be9007eeacdedaeab1d4dc317966bab1b1e8d53a1c',
+    )
+  })
+
+  it.each([
+    ['create', ' \t'],
+    ['create', ''],
+    ['checkAvailability', ''],
+    ['checkAvailability', '\u200b\u3000'],
+  ] as const)(
+    '%s rejects a transaction ID %j that is blank after trimming',
+    async (method, transactionId) => {
+      const { transport, refunds } = buildWith()
+      const error = await refunds[method]({ transactionId }).catch((caught) => caught)
+      expect(error).toBeInstanceOf(DPayValueError)
+      expect(error.message).toBe('transaction_id must not be empty')
+      expect(transport.requests).toHaveLength(0)
+    },
+  )
+
+  it('rejects a service that is blank after trimming, before the transaction ID', async () => {
+    const { transport, refunds } = buildWith('\u3000')
+    await expect(refunds.create({ transactionId: '' })).rejects.toThrow(
+      new DPayValueError('service must not be empty'),
+    )
+    expect(transport.requests).toHaveLength(0)
+  })
+
+  it('checks the webhook events, then the message ID, then the service and the transaction ID', async () => {
+    const { refunds } = buildWith('\u3000')
+    const wrongEvents = WebhookTarget.create('https://shop.example/hook', ['payment.succeeded'])
+    await expect(
+      refunds.create({ transactionId: '', webhook: wrongEvents, messageId: 'RET\n' }),
+    ).rejects.toThrow(
+      new DPayValueError('Event "payment.succeeded" is not allowed in the webhook object of a refund'),
+    )
+    await expect(refunds.create({ transactionId: '', messageId: 'RET\n' })).rejects.toThrow(
+      new DPayValueError('Refund message ID must be non-empty printable ASCII'),
+    )
+  })
+
+  it('does not trim the message ID header', async () => {
+    const { transport, refunds } = buildWith()
+    transport.queueJson(200, { status: 'success', refund: true })
+    await refunds.create({ transactionId: 'TX-1', messageId: ' RET-1 ' })
+    expect(transport.lastRequest.headers['DigitalPayments-PSP-Message-ID']).toBe(' RET-1 ')
+  })
+})
+
+describe('checkAvailability decides by the body, not by a list of statuses', () => {
+  it('throws on the Laravel validation 422, which has no refund key', async () => {
+    const { transport, refunds } = build()
+    transport.queueJson(422, {
+      message: 'The transaction id field is required.',
+      errors: { transaction_id: ['The transaction id field is required.'] },
+    })
+    const error = await refunds.checkAvailability({ transactionId: 'tx-1' }).catch((e) => e)
+    expect(error).toBeInstanceOf(InvalidRequestError)
+    expect(error.httpStatus).toBe(422)
+  })
+
+  it('throws on the throttle 429, which has no refund key', async () => {
+    const { transport, refunds } = build()
+    transport.queueJson(
+      429,
+      { status: 'error', message: 'Too Many Requests', error: 'Too Many Requests' },
+      { 'Retry-After': '12' },
+    )
+    const error = await refunds.checkAvailability({ transactionId: 'tx-1' }).catch((e) => e)
+    expect(error).toBeInstanceOf(RateLimitError)
+    expect(error.retryAfter).toBe(12)
+  })
+
+  it('answers a 422 that carries the refund key', async () => {
+    const { transport, refunds } = build()
+    transport.queueJson(422, { status: 'error', refund: false, message: 'Refund not possible' })
+    const availability = await refunds.checkAvailability({ transactionId: 'tx-1' })
+    expect(availability.isAvailable).toBe(false)
+    expect(availability.httpStatus).toBe(422)
+  })
+})
+
+function sha256(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex')
+}

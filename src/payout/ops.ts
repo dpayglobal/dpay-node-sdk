@@ -2,7 +2,7 @@ import { DPayValueError } from '../errors.js'
 import { PANEL } from '../internal/base-urls.js'
 import type { ChecksumCalculator } from '../internal/checksum.js'
 import { type Operation, decodeRecordOrFail } from '../internal/operation.js'
-import { phpTrim } from '../internal/php.js'
+import { requiredTrimmed, signPanelBody } from '../internal/server-trim.js'
 import { type PayoutState, type PayoutType, assertPayoutState, assertPayoutType } from './enums.js'
 import {
   type PayoutDetails,
@@ -57,10 +57,10 @@ export function payoutDetailsOperation(
   checksum: ChecksumCalculator,
   params: PayoutDetailsParams,
 ): Operation<PayoutDetails> {
-  const body: Record<string, unknown> = { service }
-  if (params.timestamp !== undefined) body.timestamp = params.timestamp
-  body.withdraw_id = params.withdrawId
-  body.checksum = checksum.orderedBody(body)
+  const fields: Record<string, unknown> = { service: requiredTrimmed(service, 'service') }
+  if (params.timestamp !== undefined) fields.timestamp = params.timestamp
+  fields.withdraw_id = params.withdrawId
+  const body = signPanelBody(checksum, fields)
   return {
     method: 'POST',
     host: PANEL,
@@ -72,39 +72,44 @@ export function payoutDetailsOperation(
 
 /**
  * `{service, date_from?, date_to?, state?, type?, page?, per_page?, checksum}` - this order whatever the order of
- * `params`, signed with sha256(value1|value2|...|hash) over the values sent.
+ * `params`, strings trimmed like the API trims them, signed with sha256(value1|value2|...|hash) over the values sent.
  */
 export function listPayoutsOperation(
   service: string,
   checksum: ChecksumCalculator,
   params: ListPayoutsParams,
 ): Operation<PayoutPage> {
+  const fields: Record<string, unknown> = { service: requiredTrimmed(service, 'service') }
   const unknown = Object.keys(params).filter((key) => !LIST_KEYS.includes(key))
   if (unknown.length > 0) throw new DPayValueError(`Unknown payout filter "${unknown.join('", "')}"`)
 
-  const body: Record<string, unknown> = { service }
+  // Like PHP isset(): a null filter is not sent. Wrong types throw DPayValueError, like every argument check.
   for (const [key, field] of [
     ['dateFrom', 'date_from'],
     ['dateTo', 'date_to'],
   ] as const) {
     const value: unknown = params[key]
     if (value === undefined || value === null) continue
+    if (typeof value !== 'string') throw new DPayValueError(`${field} must be a string`)
     // The API trims strings before it verifies the checksum - an untrimmed value would fail with 401
-    const date = typeof value === 'string' ? phpTrim(value) : ''
-    if (date === '') throw new DPayValueError(`${field} must not be empty`)
-    body[field] = date
+    fields[field] = requiredTrimmed(value, field)
   }
-  // Like PHP isset(): a null filter is not sent
-  if (params.state !== undefined && params.state !== null) {
-    assertPayoutState(params.state)
-    body.state = params.state
+  const state: unknown = params.state
+  if (state !== undefined && state !== null) {
+    if (typeof state !== 'number' || !Number.isInteger(state)) {
+      throw new DPayValueError('state must be an integer')
+    }
+    assertPayoutState(state)
+    fields.state = state
   }
-  if (params.type !== undefined && params.type !== null) {
-    assertPayoutType(params.type)
-    body.type = params.type
+  const type: unknown = params.type
+  if (type !== undefined && type !== null) {
+    if (typeof type !== 'string') throw new DPayValueError('type must be a string')
+    assertPayoutType(type)
+    fields.type = type
   }
-  addPage(body, params.page, params.perPage, 200)
-  body.checksum = checksum.orderedBody(body)
+  addPage(fields, params.page, params.perPage, 200)
+  const body = signPanelBody(checksum, fields)
   return {
     method: 'POST',
     host: PANEL,
@@ -120,9 +125,12 @@ export function payoutDetailsFullOperation(
   checksum: ChecksumCalculator,
   params: PayoutDetailsFullParams,
 ): Operation<PayoutSettlement> {
-  const body: Record<string, unknown> = { service, withdraw_id: params.withdrawId }
-  addPage(body, params.page, params.perPage, 500)
-  body.checksum = checksum.orderedBody(body)
+  const fields: Record<string, unknown> = {
+    service: requiredTrimmed(service, 'service'),
+    withdraw_id: params.withdrawId,
+  }
+  addPage(fields, params.page, params.perPage, 500)
+  const body = signPanelBody(checksum, fields)
   return {
     method: 'POST',
     host: PANEL,

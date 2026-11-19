@@ -31,10 +31,12 @@ export interface PayoutDetails {
   readonly creationDate: string | null
   /** When the transfer was sent to the bank (`payouts.detailsFull()` only); null until then. */
   readonly exportDate: string | null
-  /** Paysafecard payout (`paysafecard` = 1, present only for regular, non-direct settlements). */
+  /** Paysafecard payout (`paysafecard` is the JSON integer 1; sent only for regular, non-direct settlements). */
   readonly isPaysafecard: boolean
+  /** `direct_settlement` is the JSON integer 1. */
   readonly isDirectSettlement: boolean
   readonly nrb: string | null
+  /** `declined` is the JSON integer 1. */
   readonly isDeclined: boolean
   readonly declineReason: string | null
   readonly declineStatus: string | null
@@ -77,6 +79,7 @@ export interface PayoutListItem {
   readonly creationDate: string | null
   /** When the transfer was sent to the bank; null until then. */
   readonly exportDate: string | null
+  /** `declined` is the JSON integer 1. */
   readonly isDeclined: boolean
   readonly raw: Record<string, unknown>
 }
@@ -210,7 +213,7 @@ function parsePayoutListItem(data: Record<string, unknown>): PayoutListItem {
     currency,
     creationDate: strictString(data, 'creation_date'),
     exportDate: strictString(data, 'export_date'),
-    isDeclined: numericInt(data, 'declined', 0) === 1,
+    isDeclined: flag(data, 'declined'),
     raw: data,
   })
 }
@@ -254,9 +257,9 @@ function parsePayoutReceiver(data: Record<string, unknown>, currency: string): P
   })
 }
 
+/** The API sends its 0/1 flags as JSON integers - only the integer 1 is true (not `"1"`, `true` or `2`). */
 function flag(data: Record<string, unknown>, key: string): boolean {
-  const value = data[key]
-  return isScalar(value) ? phpInt(value) === 1 : false
+  return data[key] === 1
 }
 
 /** PHP `is_numeric($value) ? (int) $value : $default`. */

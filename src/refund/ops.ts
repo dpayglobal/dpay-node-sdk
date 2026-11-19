@@ -5,6 +5,7 @@ import type { ChecksumCalculator } from '../internal/checksum.js'
 import { mapError } from '../internal/error-mapper.js'
 import { type Operation, decodeRecordOrFail } from '../internal/operation.js'
 import { phpTrim } from '../internal/php.js'
+import { requiredTrimmed, signPanelBody } from '../internal/server-trim.js'
 import type { Money } from '../money.js'
 import { WebhookEventType } from '../webhook/event-type.js'
 import { type WebhookTarget, serializeWebhookTarget } from '../webhook/target.js'
@@ -37,20 +38,25 @@ export interface CreateRefundParams extends RefundParams {
   messageId?: string
 }
 
+/**
+ * `{service, transaction_id, value?, reason?, webhook?, checksum}` - every string trimmed the way the API trims it
+ * before it verifies the checksum, then signed over the whole body in wire order, the webhook object flattened:
+ * ...|url|event1|event2|hash. A reason that is blank after trimming is sent as "" (an empty segment).
+ */
 function signedBody(
   service: string,
   checksum: ChecksumCalculator,
   params: RefundParams,
-  webhook?: WebhookTarget,
+  webhook?: Record<string, unknown>,
 ): Record<string, unknown> {
-  const body: Record<string, unknown> = { service, transaction_id: params.transactionId }
+  const body: Record<string, unknown> = {
+    service: requiredTrimmed(service, 'service'),
+    transaction_id: requiredTrimmed(params.transactionId, 'transaction_id'),
+  }
   if (params.amount !== undefined) body.value = params.amount.toDecimal()
   if (params.reason !== undefined) body.reason = params.reason
-  if (webhook !== undefined)
-    body.webhook = serializeWebhookTarget(webhook, WebhookEventType.REFUND, 'a refund')
-  // The whole body in wire order, the webhook object flattened: ...|url|event1|event2|hash
-  body.checksum = checksum.orderedBody(body)
-  return body
+  if (webhook !== undefined) body.webhook = webhook
+  return signPanelBody(checksum, body)
 }
 
 export function createRefundOperation(
@@ -58,6 +64,10 @@ export function createRefundOperation(
   checksum: ChecksumCalculator,
   params: CreateRefundParams,
 ): Operation<Refund> {
+  const webhook =
+    params.webhook === undefined
+      ? undefined
+      : serializeWebhookTarget(params.webhook, WebhookEventType.REFUND, 'a refund')
   const headers: Record<string, string> = {}
   if (params.messageId !== undefined) {
     const messageId: unknown = params.messageId
@@ -70,7 +80,7 @@ export function createRefundOperation(
     method: 'POST',
     host: PANEL,
     path: '/api/v1/pbl/refund',
-    body: signedBody(service, checksum, params, params.webhook),
+    body: signedBody(service, checksum, params, webhook),
     headers,
     parse: (response) => parseRefund(decodeRecordOrFail(response)),
   }
@@ -103,8 +113,9 @@ function parseAvailability(response: ApiResponse): RefundAvailability {
 }
 
 /**
- * Every answer with the `refund` key is an availability answer: HTTP 200 and any 4xx business refusal (400, 402,
- * 404, 406, 409, 410, 411, 423...), a 401 only when it is not the checksum error "Unauthorized request".
+ * Decided by the body: an answer with the `refund` key is an availability answer for HTTP 200 and any 4xx (today
+ * 400, 402, 404, 406, 409, 410, 411, 423), a 401 only when it is not the checksum error "Unauthorized request".
+ * 422 and 429 throw because the API sends them without the `refund` key; 5xx always throws.
  */
 function isOutcome(status: number, data: Record<string, unknown>): boolean {
   if (status === 401) return data.message !== 'Unauthorized request'

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DPayValueError, SignatureVerificationError } from '../../src/errors.js'
 import { ChecksumCalculator } from '../../src/internal/checksum.js'
+import { serverTrim, trimStrings } from '../../src/internal/server-trim.js'
 import { constructIpnEvent } from '../../src/ipn/verifier.js'
 import { WebhookVerifier } from '../../src/webhook/verifier.js'
 
@@ -27,6 +28,15 @@ interface ApiVectors {
     rotation_signature: string
   }
   ipn: Array<{ name: string; payload: Record<string, unknown> }>
+  server_trim: {
+    strings: Array<{ name: string; input: string; trimmed: string }>
+    bodies: Array<{
+      name: string
+      input: Record<string, unknown>
+      body: Record<string, unknown>
+      checksum: string
+    }>
+  }
 }
 
 const VECTORS = JSON.parse(
@@ -47,6 +57,8 @@ describe('shared API vectors', () => {
     expect(VECTORS.operation).toHaveLength(4)
     expect(VECTORS.ordered_body).toHaveLength(9)
     expect(VECTORS.ipn).toHaveLength(3)
+    expect(VECTORS.server_trim.strings).toHaveLength(8)
+    expect(VECTORS.server_trim.bodies).toHaveLength(4)
   })
 
   it.each(VECTORS.secret_second.map((vector) => [vector.name, vector] as const))(
@@ -84,6 +96,26 @@ describe('shared API vectors', () => {
       }),
     ).toBe(expected)
   })
+})
+
+describe('shared server_trim vectors (panel API trims every string before the checksum)', () => {
+  it.each(VECTORS.server_trim.strings.map((vector) => [vector.name, vector] as const))(
+    'string %s',
+    (_name, vector) => {
+      expect(serverTrim(vector.input)).toBe(vector.trimmed)
+    },
+  )
+
+  it.each(VECTORS.server_trim.bodies.map((vector) => [vector.name, vector] as const))(
+    'body %s',
+    (_name, vector) => {
+      const trimmed = trimStrings(vector.input)
+      expect(trimmed).toEqual(vector.body)
+      expect(JSON.stringify(trimmed)).toBe(JSON.stringify(vector.body))
+      expect(calculator.orderedBody(trimmed)).toBe(vector.checksum)
+      expect(calculator.orderedBody(vector.input)).not.toBe(vector.checksum)
+    },
+  )
 })
 
 describe('shared IPN vectors', () => {

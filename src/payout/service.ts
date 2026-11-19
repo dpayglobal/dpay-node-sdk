@@ -28,8 +28,10 @@ export class PayoutService {
   }
 
   /**
-   * Your payouts, newest first - the source of `withdrawId`. Filters: creation date range (`dateFrom`, `dateTo`),
-   * `state` (`PayoutState`), `type` (`PayoutType`); `perPage` 1-200.
+   * Your payouts, newest first - the source of `withdrawId`. Filters: creation date range (`dateFrom`, `dateTo`,
+   * strings sent trimmed like every string of a panel request), `state` (`PayoutState`, integer), `type`
+   * (`PayoutType`, string); `perPage` 1-200. A value of another type, an unknown filter or a blank date throws
+   * `DPayValueError`.
    */
   async list(params: ListPayoutsParams = {}, options?: RequestOptions): Promise<PayoutPage> {
     return this.api.execute(listPayoutsOperation(this.api.service, this.api.checksum, params), options)

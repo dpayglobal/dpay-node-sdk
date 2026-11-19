@@ -72,6 +72,27 @@ describe('PaymentService.details', () => {
     )
     expect(transaction.isPaid).toBe(true)
   })
+
+  it('sends and signs the transaction ID trimmed like the API', async () => {
+    const transport = new MockHttpClient()
+    const config = Config.fromOptions({ service: 'MyShop', secretHash: 'secret123', httpClient: transport })
+    const payments = new PaymentService(new ApiRequestor(config, transport))
+    transport.queueJson(200, { transaction: { id: 'tx-1', status: 'paid' } })
+    await payments.details('\t30D9493D-1D73-3FBD-A5D4-633723CC7A68 ')
+    expect(transport.lastRequestBody).toEqual({
+      service: 'MyShop',
+      transaction_id: '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+      checksum: '3b345f55900ae6a43220dd14a3827ed9a26a02a3eb46b856d302e2baa44b48a4',
+    })
+  })
+
+  it.each(['', '\u200b'])('rejects the blank transaction ID %j before sending', async (transactionId) => {
+    const { transport, payments } = build()
+    await expect(payments.details(transactionId)).rejects.toThrow(
+      new DPayValueError('transaction_id must not be empty'),
+    )
+    expect(transport.requests).toHaveLength(0)
+  })
 })
 
 describe('PaymentService.register answers of 0.3.0', () => {

@@ -2,6 +2,7 @@ import type { ApiResponse } from '../http/types.js'
 import { PANEL } from '../internal/base-urls.js'
 import type { ChecksumCalculator } from '../internal/checksum.js'
 import { type Operation, decodeJsonOrFail } from '../internal/operation.js'
+import { requiredTrimmed, signPanelBody } from '../internal/server-trim.js'
 import { type Bank, parseBank } from './models.js'
 
 export function allBanksOperation(): Operation<Bank[]> {
@@ -13,11 +14,10 @@ export function forServiceOperation(
   checksum: ChecksumCalculator,
   timestamp?: number,
 ): Operation<Bank[]> {
-  const body: Record<string, unknown> = {
-    service,
+  const body = signPanelBody(checksum, {
+    service: requiredTrimmed(service, 'service'),
     timestamp: timestamp ?? Math.floor(Date.now() / 1000),
-  }
-  body.checksum = checksum.orderedBody(body)
+  })
   return { method: 'POST', host: PANEL, path: '/api/v1/pbl/banks', body, parse: parseBanks }
 }
 
