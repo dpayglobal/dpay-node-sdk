@@ -45,6 +45,8 @@ export interface GooglePayParams {
 export interface ApplePayParams {
   deviceInfo: DeviceInfoParams
   token?: string
+  /** Payer's email (sent with the APPLE_PAY call, like for Google Pay). */
+  email?: string
   channelId?: number
 }
 
@@ -81,12 +83,13 @@ export function serializeGooglePay(params: GooglePayParams): Record<string, unkn
 }
 
 /**
- * Builds the wire-format Apple Pay object. Omitting `token` sends `xPayType: "APPLE_PAY_INIT"`
+ * Builds the wire-format Apple Pay object (`email`, `channelId`, `xPayType`, `xPayToken`, `deviceInfo`). Omitting `token` sends `xPayType: "APPLE_PAY_INIT"`
  * with no `xPayToken`, to initialise a session; giving a `token` sends `xPayType: "APPLE_PAY"`
  * with that token, to pay.
  */
 export function serializeApplePay(params: ApplePayParams): Record<string, unknown> {
   const body: Record<string, unknown> = {}
+  if (params.email !== undefined) body.email = params.email
   if (params.channelId !== undefined) body.channelId = params.channelId
   body.xPayType = params.token === undefined ? 'APPLE_PAY_INIT' : 'APPLE_PAY'
   if (params.token !== undefined) body.xPayToken = params.token

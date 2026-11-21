@@ -1,3 +1,4 @@
+import { type CardError, parseCardError } from './card/card-error.js'
 import { isScalar, phpJsonEncode, phpStrval } from './internal/php.js'
 
 export type DPayErrorType =
@@ -66,6 +67,13 @@ export class ApiError extends DPayError {
   readonly rawBody: string
   /** Detailed reason next to the code, for example `https_required` for `WEBHOOK_URL_INVALID`. */
   readonly reason: string | null
+  /**
+   * Transaction created before the error, when the API returned one (`transactionId`, for example a declined
+   * charge on a saved card or a declined payment) - use it to query the transaction.
+   */
+  readonly transactionId: string | null
+  /** Card decline details (`cardError` of a Payments API error, `error` of a declined card operation). */
+  readonly cardError: CardError | null
 
   constructor(
     message: string,
@@ -74,6 +82,8 @@ export class ApiError extends DPayError {
     fieldErrors: Record<string, string[]> = {},
     rawBody = '',
     reason: string | null = null,
+    transactionId: string | null = null,
+    cardError: CardError | null = null,
   ) {
     super(message)
     this.httpStatus = httpStatus
@@ -81,6 +91,8 @@ export class ApiError extends DPayError {
     this.fieldErrors = fieldErrors
     this.rawBody = rawBody
     this.reason = reason
+    this.transactionId = transactionId
+    this.cardError = cardError
   }
 }
 
@@ -118,6 +130,8 @@ export class RateLimitError extends ApiError {
   readonly limit: number | null
   /** Value of `X-RateLimit-Remaining`. */
   readonly remaining: number | null
+  /** Unix time (seconds) when the limit resets - the `X-RateLimit-Reset` header. */
+  readonly reset: number | null
 
   constructor(
     message: string,
@@ -126,19 +140,19 @@ export class RateLimitError extends ApiError {
     limit: number | null = null,
     remaining: number | null = null,
     rawBody = '',
+    reset: number | null = null,
   ) {
     super(message, httpStatus, null, {}, rawBody)
     this.retryAfter = retryAfter
     this.limit = limit
     this.remaining = remaining
+    this.reset = reset
   }
 }
 
 /** Payment registration rejected with HTTP 200 and `error: true`. */
 export class PaymentRejectedError extends ApiError {
   override readonly type = 'payment_rejected_error'
-  /** Transaction identifier returned alongside the rejection, when present. */
-  readonly transactionId: string | null
   /** Provider's description of the decline (`additionalInfo.error_description`), when it sent one. */
   readonly errorDescription: string | null
 
@@ -151,8 +165,7 @@ export class PaymentRejectedError extends ApiError {
     transactionId: string | null = null,
     errorDescription: string | null = null,
   ) {
-    super(message, httpStatus, errorCode, fieldErrors, rawBody)
-    this.transactionId = transactionId
+    super(message, httpStatus, errorCode, fieldErrors, rawBody, null, transactionId)
     this.errorDescription = errorDescription
   }
 
@@ -175,13 +188,18 @@ export class PaymentRejectedError extends ApiError {
   }
 }
 
-/** Card payment rejected with HTTP 200 and `success != true`. */
+/**
+ * Card payment rejected with HTTP 200 and `success != true`. `message` and `errorCode` hold the API `message`
+ * (for example `DCC_OFFER_EXPIRED`); `cardError` holds the decline details (`error`) when the decline carries a
+ * recognised code.
+ */
 export class CardPaymentError extends ApiError {
   override readonly type = 'card_payment_error'
 
   static fromApi(data: Record<string, unknown>): CardPaymentError {
     const message = typeof data.message === 'string' ? data.message : 'Card payment failed'
-    return new CardPaymentError(message, 200, message, {}, phpJsonEncode(data))
+    const error = isRecord(data.error) ? parseCardError(data.error) : null
+    return new CardPaymentError(message, 200, message, {}, phpJsonEncode(data), null, null, error)
   }
 }
 

@@ -1,14 +1,20 @@
+import { DPayValueError } from '../errors.js'
 import type { ApiResponse } from '../http/types.js'
 import { PANEL } from '../internal/base-urls.js'
 import type { ChecksumCalculator } from '../internal/checksum.js'
 import { mapError } from '../internal/error-mapper.js'
 import { type Operation, decodeRecordOrFail } from '../internal/operation.js'
+import { phpTrim } from '../internal/php.js'
+import { requiredTrimmed, signPanelBody } from '../internal/server-trim.js'
 import type { Money } from '../money.js'
 import { WebhookEventType } from '../webhook/event-type.js'
 import { type WebhookTarget, serializeWebhookTarget } from '../webhook/target.js'
 import { type Refund, type RefundAvailability, parseRefund, parseRefundAvailability } from './models.js'
 
-const AVAILABILITY_OUTCOMES = [200, 400, 402, 406, 409, 410, 411]
+/** Request header with your own refund identifier; it sets the refund transfer title. */
+export const REFUND_MESSAGE_ID_HEADER = 'DigitalPayments-PSP-Message-ID'
+
+const PRINTABLE_ASCII = /^[\x20-\x7E]+$/
 
 export interface RefundParams {
   transactionId: string
@@ -24,22 +30,33 @@ export interface CreateRefundParams extends RefundParams {
    * Part of the checksum.
    */
   webhook?: WebhookTarget
+  /**
+   * Your own refund identifier, sent in the `DigitalPayments-PSP-Message-ID` header (not part of the checksum):
+   * the refund transfer title becomes `dpay.pl zwrot {messageId}` and `Refund.message` returns it. Printable
+   * ASCII; the API keeps the first 24 characters.
+   */
+  messageId?: string
 }
 
+/**
+ * `{service, transaction_id, value?, reason?, webhook?, checksum}` - every string trimmed the way the API trims it
+ * before it verifies the checksum, then signed over the whole body in wire order, the webhook object flattened:
+ * ...|url|event1|event2|hash. A reason that is blank after trimming is sent as "" (an empty segment).
+ */
 function signedBody(
   service: string,
   checksum: ChecksumCalculator,
   params: RefundParams,
-  webhook?: WebhookTarget,
+  webhook?: Record<string, unknown>,
 ): Record<string, unknown> {
-  const body: Record<string, unknown> = { service, transaction_id: params.transactionId }
+  const body: Record<string, unknown> = {
+    service: requiredTrimmed(service, 'service'),
+    transaction_id: requiredTrimmed(params.transactionId, 'transaction_id'),
+  }
   if (params.amount !== undefined) body.value = params.amount.toDecimal()
   if (params.reason !== undefined) body.reason = params.reason
-  if (webhook !== undefined)
-    body.webhook = serializeWebhookTarget(webhook, WebhookEventType.REFUND, 'a refund')
-  // The whole body in wire order, the webhook object flattened: ...|url|event1|event2|hash
-  body.checksum = checksum.orderedBody(body)
-  return body
+  if (webhook !== undefined) body.webhook = webhook
+  return signPanelBody(checksum, body)
 }
 
 export function createRefundOperation(
@@ -47,11 +64,24 @@ export function createRefundOperation(
   checksum: ChecksumCalculator,
   params: CreateRefundParams,
 ): Operation<Refund> {
+  const webhook =
+    params.webhook === undefined
+      ? undefined
+      : serializeWebhookTarget(params.webhook, WebhookEventType.REFUND, 'a refund')
+  const headers: Record<string, string> = {}
+  if (params.messageId !== undefined) {
+    const messageId: unknown = params.messageId
+    if (typeof messageId !== 'string' || !PRINTABLE_ASCII.test(messageId) || phpTrim(messageId) === '') {
+      throw new DPayValueError('Refund message ID must be non-empty printable ASCII')
+    }
+    headers[REFUND_MESSAGE_ID_HEADER] = messageId
+  }
   return {
     method: 'POST',
     host: PANEL,
     path: '/api/v1/pbl/refund',
-    body: signedBody(service, checksum, params, params.webhook),
+    body: signedBody(service, checksum, params, webhook),
+    headers,
     parse: (response) => parseRefund(decodeRecordOrFail(response)),
   }
 }
@@ -82,7 +112,12 @@ function parseAvailability(response: ApiResponse): RefundAvailability {
   throw mapError(response)
 }
 
+/**
+ * Decided by the body: an answer with the `refund` key is an availability answer for HTTP 200 and any 4xx (today
+ * 400, 402, 404, 406, 409, 410, 411, 423), a 401 only when it is not the checksum error "Unauthorized request".
+ * 422 and 429 throw because the API sends them without the `refund` key; 5xx always throws.
+ */
 function isOutcome(status: number, data: Record<string, unknown>): boolean {
-  if (AVAILABILITY_OUTCOMES.includes(status)) return true
-  return status === 401 && data.message !== 'Unauthorized request'
+  if (status === 401) return data.message !== 'Unauthorized request'
+  return status === 200 || (status >= 400 && status < 500)
 }

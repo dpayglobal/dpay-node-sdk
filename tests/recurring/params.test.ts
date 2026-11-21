@@ -135,8 +135,8 @@ describe('serializeRecurringRegistration', () => {
   it('validates label, model, terms and the other fields', () => {
     const base = { label: 'Abonament', model: RecurringModel.M, termsUrl: TERMS }
     const cases: Array<[Partial<RecurringRegistrationParams>, string]> = [
-      [{ label: '' }, 'Recurring payment label must be 1-50 characters'],
-      [{ label: 'ż'.repeat(51) }, 'Recurring payment label must be 1-50 characters'],
+      [{ label: '' }, 'Recurring payment label must be 1-35 characters'],
+      [{ label: 'ż'.repeat(36) }, 'Recurring payment label must be 1-35 characters'],
       [{ model: 'B' }, 'Invalid recurring model "B"'],
       [{ termsUrl: 'not a url' }, 'Invalid terms URL "not a url"'],
       [{ termsUrl: `https://shop.example/${'a'.repeat(2030)}` }, 'Invalid terms URL'],
@@ -155,6 +155,6 @@ describe('serializeRecurringRegistration', () => {
       expect(() => serializeRecurringRegistration({ ...base, ...override })).toThrow(message)
       expect(() => serializeRecurringRegistration({ ...base, ...override })).toThrow(DPayValueError)
     }
-    expect(() => serializeRecurringRegistration({ ...base, label: 'ż'.repeat(50) })).not.toThrow()
+    expect(() => serializeRecurringRegistration({ ...base, label: 'ż'.repeat(35) })).not.toThrow()
   })
 })

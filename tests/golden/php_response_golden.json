@@ -469,7 +469,7 @@
             "creation_date": null,
             "is_direct_settlement": false,
             "nrb": null,
-            "is_declined": true,
+            "is_declined": false,
             "decline_reason": null,
             "decline_status": null,
             "receiver": null

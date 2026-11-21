@@ -28,7 +28,7 @@
                 "User-Agent": "dpay-php-sdk/0.2.0 php/8.4.24",
                 "Content-Type": "application/json"
             },
-            "body": "{\"service\":\"test_service\",\"value\":\"5.00\",\"transactionType\":\"card_recurring\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"register_blik_alias\":{\"label\":\"Moj alias\",\"type\":\"UID\"},\"register_card_recurring\":{\"label\":\"Mandat\",\"frequency\":\"MONTHLY\",\"limit_amt\":20000,\"tot_limit_amt\":100000,\"is_limit_amt_fixed\":false,\"expiration_date\":\"2028-12-31\",\"init_date\":\"2026-09-01\"},\"checksum\":\"bb6346930c49321bad9714039e350519df459075a20c94bd1ef8f79ba26bfd0c\"}"
+            "body": "{\"service\":\"test_service\",\"value\":\"5.00\",\"transactionType\":\"card_recurring\",\"url_success\":\"https://shop.test/ok\",\"url_fail\":\"https://shop.test/fail\",\"url_ipn\":\"https://shop.test/ipn\",\"currency_code\":\"CZK\",\"register_blik_alias\":{\"label\":\"Moj alias\",\"type\":\"UID\"},\"register_card_recurring\":{\"label\":\"Mandat\",\"frequency\":\"MONTHLY\",\"limit_amt\":20000,\"tot_limit_amt\":100000,\"is_limit_amt_fixed\":false,\"expiration_date\":\"2028-12-31\",\"init_date\":\"2026-09-01\"},\"checksum\":\"bb6346930c49321bad9714039e350519df459075a20c94bd1ef8f79ba26bfd0c\"}"
         },
         {
             "method": "POST",

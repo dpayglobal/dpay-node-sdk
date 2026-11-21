@@ -16,8 +16,8 @@ describe('serializeBlikAliasRegistration', () => {
   })
 
   it('validates the label and the type', () => {
-    expect(() => serializeBlikAliasRegistration({ label: '' })).toThrow('Alias label must be 1-50 characters')
-    expect(() => serializeBlikAliasRegistration({ label: 'x'.repeat(51) })).toThrow(DPayValueError)
+    expect(() => serializeBlikAliasRegistration({ label: '' })).toThrow('Alias label must be 1-35 characters')
+    expect(() => serializeBlikAliasRegistration({ label: 'x'.repeat(36) })).toThrow(DPayValueError)
     expect(() => serializeBlikAliasRegistration({ label: 'a', type: 'nope' })).toThrow(
       'Invalid BLIK alias type "nope"',
     )

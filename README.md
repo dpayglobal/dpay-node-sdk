@@ -46,6 +46,52 @@ if (payment.redirectUrl !== null) {
 
 Adres `ipn` jest opcjonalny - bez niego IPN nie przychodzi, a wynik płatności dostajesz webhookiem.
 
+## Waluta
+
+Waluta płatności to waluta kwoty `Money`. Kwota w innej walucie niż PLN wysyła `currency_code` sama
+(od 0.3.0), np. CZK dla banków czeskich, EUR dla MB WAY, Multibanco i banków słowackich. Serwis musi mieć
+tę walutę włączoną (PLN, EUR, CZK, USD, RON).
+
+```js
+import { Currency, Money, TransactionType } from '@dpayglobal/dpay-node-sdk'
+
+await dpay.payments.register({ amount: Money.of(49900, Currency.CZK), transactionType: TransactionType.TRANSFERS, urls })
+```
+
+`currencyCode` (także obok `phoneNumber`) przyjmuje tylko walutę kwoty - `Money.pln()` z kodem `EUR` rzuca
+`DPayValueError`.
+
+## MB WAY i kanały bezpośrednie
+
+Kanał bezpośredni (`channel`) wymaga emaila, imienia i nazwiska płatnika (`payer`) oraz `acceptTos`; kanały
+`tester`, `paypal`, `installment` i `paysafecard` są odrzucane. MB WAY wymaga dodatkowo kanału `373` i pełnego
+`deviceInfo` z `browserJavaEnabled` - SDK sprawdza to przed wysłaniem (API odpowiedziałoby 422).
+
+```js
+import { Currency, Money, TransactionType } from '@dpayglobal/dpay-node-sdk'
+
+const payment = await dpay.payments.register({
+  amount: Money.of(1250, Currency.EUR),
+  transactionType: TransactionType.MB_WAY_DIRECT,
+  urls,
+  phoneNumber: '+351912345678',
+  currencyCode: Currency.EUR,
+  channel: '373',
+  payer: { email: 'cliente@example.pt', firstName: 'Joao', lastName: 'Silva' },
+  acceptTos: true,
+  deviceInfo: { ...deviceInfo, browserJavaEnabled: false },
+})
+```
+
+Multibanco (kanał `390`, EUR) zwraca referencję do pokazania płatnikowi:
+
+```js
+const reference = payment.multibanco // entity, reference, amount (Money), expiresAt
+```
+
+Odpowiedź "Transaction paid" (płatność już opłacona) niesie transakcję w `payment.paidTransaction`
+(`status`, `isPaid`, `value` w walucie kwoty).
+
 ## Płatności cykliczne
 
 Rejestracja idzie razem z płatnością kodem BLIK klienta (kwota `0` - sama zgoda, więcej - opłata inicjalna).
@@ -91,6 +137,9 @@ model `O` nie przyjmuje częstotliwości ani limitów. SDK sprawdza to przed wys
 Obciążenie wiąże alias z sumą kontrolną, a anulowanie ma własną sumę - SDK liczy obie.
 Limity API: `status` do 60, `retry` i `cancel` do 30 zapytań na minutę (licznik wspólny z resztą API
 płatności z tego adresu IP) - nie odpytuj statusu w pętli, wynik przychodzi webhookiem.
+Odmowę ponowienia opisuje `error.fieldErrors.retry` (stałe `RetryRefusal`), a natychmiastowy sukces
+`retry.isSuccess`. Zmiany statusu płatności cyklicznej przychodzą też jako IPN `alias_update` (patrz Obsługa IPN).
+Etykieta `recurringRegistration.label` i `registerBlikAlias.label` ma do 35 znaków (limit BLIK).
 
 ## Webhooki
 
@@ -99,7 +148,7 @@ Zdarzenia (`payment.succeeded`, `refund.failed`, `recurring_payment.canceled` i 
 
 ```js
 import express from 'express'
-import { SignatureVerificationError, WebhookVerifier } from '@dpayglobal/dpay-node-sdk'
+import { PaymentObjectStatus, SignatureVerificationError, WebhookVerifier } from '@dpayglobal/dpay-node-sdk'
 
 app.post('/webhooks/dpay', express.raw({ type: 'application/json' }), (req, res) => {
   let event
@@ -111,12 +160,19 @@ app.post('/webhooks/dpay', express.raw({ type: 'application/json' }), (req, res)
     throw error
   }
 
-  if (event.type === 'payment.succeeded') {
-    const payment = event.object // kwoty w groszach
+  const payment = event.payment // PaymentObject, null dla innych obiektów
+  if (payment !== null && payment.status === PaymentObjectStatus.SUCCEEDED) {
+    await oznaczZamowienieJakoOplacone(payment.merchantReference, payment.amount) // Money, grosze + waluta
+  }
+  if (payment?.failure?.isRetryable) {
+    // np. DeclineCode.INSUFFICIENT_FUNDS - klient może zapłacić ponownie
   }
   res.status(200).end()
 })
 ```
+
+Obiekty: `event.payment`, `event.refund`, `event.recurringPayment`, `event.payout` (odmowa w `failure`: `code`
+z `DeclineCode`, `category` z `FailureCategory`, `isRetryable`); surowy obiekt - `event.object`.
 
 `constructEvent` przyjmuje body jako `Buffer` albo `string` i nagłówki jako obiekt Node (`req.headers`)
 albo `Headers` (Next.js, Hono: `await request.text()` i `request.headers`). Deduplikuj zdarzenia po `event.id`.
@@ -143,7 +199,7 @@ await dpay.payments.register({
 
 ## Obsługa IPN
 
-IPN przychodzi tylko wtedy, gdy podasz adres `ipn` w `urls`.
+IPN przychodzi tylko wtedy, gdy podasz adres `ipn` w `urls` (IPN `alias_update` także na `aliasIpnUrl`).
 
 dpay uznaje IPN za dostarczony wyłącznie, gdy body odpowiedzi to dokładnie `OK`.
 Kod HTTP nie jest sprawdzany. Zawsze porównaj kwotę z własnym zamówieniem -
@@ -170,6 +226,8 @@ app.post('/ipn', express.raw({ type: '*/*' }), async (req, res) => {
 
   if (event.isTransfer) {
     await oznaczZamowienieJakoOplacone(event.id, event.amount)
+  } else if (event.isAliasUpdate) {
+    const alias = event.aliasUpdate // changeType, aliasType, aliasStatus, aliasKey, ...
   }
 
   res.send(IPN_ACK)
@@ -177,6 +235,13 @@ app.post('/ipn', express.raw({ type: '*/*' }), async (req, res) => {
 
 app.use(express.json())
 ```
+
+IPN `alias_update` (zmiana aliasu BLIK OneClick lub płatności cyklicznej) przychodzi na `aliasIpnUrl`, a bez
+niego na adres IPN. Ma inny podpis (`sha256(id . hash . type . version)`) - `constructEvent()` rozpoznaje go po
+`type`, więc zawsze sprawdzaj typ (`isTransfer`) przed oznaczeniem zamówienia jako opłaconego: `event.id` to
+wtedy płatność, która zarejestrowała alias, `event.amount` jest puste, a `email`, `custom` i `attempt` to
+`null`/`0`. Podpis nie obejmuje pól aliasu (`event.aliasUpdate`) - przed reakcją na zmianę potwierdź stan przez
+`dpay.recurring.status()` lub `dpay.blik.alias()`.
 
 W Next.js (App Router) i Hono przekaż obiekt `Request` bezpośrednio:
 
@@ -206,11 +271,23 @@ await dpay.refunds.create({
   webhook: WebhookTarget.create('https://twojsklep.pl/webhooks/zwroty', ['refund.succeeded', 'refund.failed']),
 })
 
+// Własny identyfikator zwrotu (nagłówek DigitalPayments-PSP-Message-ID) - tytuł przelewu "dpay.pl zwrot RET-1234"
+await dpay.refunds.create({ transactionId: 'identyfikator-transakcji', amount: Money.pln(500), messageId: 'RET-1234' })
+
 const availability = await dpay.refunds.checkAvailability({ transactionId: 'identyfikator-transakcji' })
 if (availability.isAvailable) {
   // ...
 }
 ```
+
+`checkAvailability()` rozstrzyga po treści odpowiedzi, nie po liście kodów: HTTP 200 i każda odpowiedź 4xx
+z kluczem `refund` to wynik (nie wyjątek) - dziś odmowy biznesowe 400, 402, 404 (transakcja nie istnieje), 406,
+409, 410, 411, 423 i biznesowe 401; przyczynę rozróżnia `httpStatus`. Wyjątek rzucają: błędna suma kontrolna
+(401 "Unauthorized request"), każda odpowiedź bez klucza `refund` - tak API odpowiada na błędy walidacji (422)
+i limit zapytań (429) - oraz każde 5xx, także z kluczem `refund`.
+
+Identyfikator transakcji, powód i adres webhooka są wysyłane i podpisywane bez białych i niewidocznych znaków
+na brzegach - API panelu przycina je przed sprawdzeniem sumy kontrolnej (patrz [Białe znaki](#białe-znaki-w-api-panelu)).
 
 ## Szczegóły transakcji i banki
 
@@ -219,9 +296,41 @@ const transaction = await dpay.payments.details('identyfikator-transakcji')
 transaction.isPaid
 transaction.availableRefundAmount.toDecimal()
 transaction.refunds
+transaction.rate // prowizja, np. '1.49'
+transaction.urls // success, fail, ipn
 
 const banks = await dpay.banks.forService()
 ```
+
+## Wypłaty
+
+```js
+import { PayoutState } from '@dpayglobal/dpay-node-sdk'
+
+for await (const payout of dpay.payouts.iterate({ dateFrom: '2026-08-01', state: PayoutState.PROCESSED })) {
+  const settlement = await dpay.payouts.detailsFull({ withdrawId: payout.id })
+  for (const position of settlement.positions) {
+    position.paymentId // transakcja z IPN; custom, net, fee, gross
+  }
+}
+```
+
+`list()` zwraca jedną stronę (`perPage` do 200), `detailsFull()` - sumy całego rozliczenia (`summaryNet`,
+`summaryCount`) i stronę pozycji (`perPage` do 500). Kwoty są w walucie wypłaty (`currency`). Pozycje wypłaty 1:1
+(`payout.positions`) wymagają polskiego IBAN z poprawną sumą kontrolną (`isValidPolishIban()`) i kwoty powyżej 0.
+Filtry `dateFrom` i `dateTo` to łańcuchy, `state` - liczba całkowita, `type` - łańcuch; wartość innego typu,
+nieznany filtr i pusta data rzucają `DPayValueError`. Flagi `isPaysafecard`, `isDirectSettlement` i `isDeclined`
+są prawdziwe tylko dla liczby `1` z API.
+
+### Białe znaki w API panelu
+
+API panelu (`refunds`, `payments.details()`, `banks.forService()`, `payouts`) przycina każdy łańcuch żądania
+przed sprawdzeniem sumy kontrolnej - spacje, tabulatory i znaki nowej linii, ale też spacje Unicode (np. U+00A0,
+U+3000) i znaki niewidoczne (np. U+200B, U+FEFF, U+0000). SDK wysyła i podpisuje te wartości (także nazwę serwisu)
+już przycięte, więc `' 2026-08-01\n'` trafia do API jako `'2026-08-01'`. Zbiór znaków jest inny niż
+w `String.prototype.trim()`, dlatego SDK nie korzysta z niego. Identyfikator transakcji, nazwa serwisu i daty,
+z których nic nie zostaje, rzucają `DPayValueError` (`transaction_id must not be empty`); powód zwrotu, z którego
+nic nie zostaje, jest wysyłany jako pusty.
 
 ## Karty S2S
 
@@ -237,6 +346,7 @@ const encryptedCardData = new CardEncryptor().encrypt(
 
 // deviceInfo to fingerprint przeglądarki płatnika, patrz DeviceInfoParams
 const result = await dpay.cards.payOtp(transactionId, { deviceInfo, encryptedCardData })
+// odmowa przy HTTP 200 rzuca CardPaymentError: errorCode to komunikat API, cardError - kod odmowy wystawcy
 
 if (result.requiresThreeDsForm) {
   // zwróć result.threeDsFormHtml jako odpowiedź HTML
@@ -248,6 +358,11 @@ if (result.hasDccOffer) {
 // Preautoryzacja: pobranie (także częściowe) i anulowanie reszty; SDK dopina service i sumę kontrolną
 await dpay.cards.capture(transactionId, { amount: Money.pln(2999) })
 await dpay.cards.cancel(transactionId)
+
+// Apple Pay: sesja z APPLE_PAY_INIT do completeMerchantValidation(), potem płatność tokenem (email opcjonalny)
+const init = await dpay.cards.applePay(transactionId, { deviceInfo })
+init.applePayMerchantSession
+await dpay.cards.applePay(transactionId, { deviceInfo, token, email: 'jan@example.com' })
 ```
 
 Klucz publiczny jest rotowany - pobieraj go przed każdą próbą płatności.
@@ -257,13 +372,23 @@ Klucz publiczny jest rotowany - pobieraj go przed każdą próbą płatności.
 Wszystkie wyjątki SDK dziedziczą po `DPayError`.
 
 ```js
-import { ApiError, DPayError, InvalidRequestError, TransportError } from '@dpayglobal/dpay-node-sdk'
+import {
+  ApiError,
+  DPayError,
+  InvalidRequestError,
+  RateLimitError,
+  TransportError,
+} from '@dpayglobal/dpay-node-sdk'
 
 try {
   const payment = await dpay.payments.register(params)
 } catch (error) {
   if (error instanceof InvalidRequestError) {
     error.fieldErrors
+    error.transactionId // transakcja utworzona przed błędem, np. odrzucone pobranie z karty
+    error.cardError // code, declineCode (ISO 8583), declineMessage
+  } else if (error instanceof RateLimitError) {
+    error.retryAfter // sekundy; reset - czas Unix odnowienia limitu
   } else if (error instanceof ApiError) {
     error.httpStatus
     error.errorCode // np. CHECKSUM_REQUIRED, WEBHOOK_URL_INVALID
@@ -288,7 +413,7 @@ dyskryminator do użycia w `switch`, gdy `instanceof` zawodzi.
 | `RateLimitError` | 429 |
 | `ApiServerError` | 5xx |
 | `PaymentRejectedError` | rejestracja odrzucona przy HTTP 200 (`errorCode`, `errorDescription`) |
-| `CardPaymentError` | płatność kartą odrzucona przy HTTP 200 |
+| `CardPaymentError` | płatność kartą odrzucona przy HTTP 200 (`cardError` z kodem odmowy) |
 | `SignatureVerificationError` | niepoprawny podpis IPN lub webhooka, webhook spoza tolerancji czasu |
 | `CardEncryptionError` | szyfrowanie danych karty nie powiodło się |
 | `TransportError` | awaria sieci, timeout lub przerwanie przez `signal` |
@@ -302,7 +427,7 @@ dyskryminator do użycia w `switch`, gdy `instanceof` zawodzi.
 | `secretHash` | `string` | Klucz Secret Hash (wymagane) |
 | `timeout` | `number` | Timeout HTTP w milisekundach (domyślnie 30000) |
 | `httpClient` | `HttpClient` | Własny transport (proxy, retry, testy) |
-| `baseUrls` | `Record<string, string>` | Nadpisanie hostów `apiPayments`, `panel`, `gateway` |
+| `baseUrls` | `Record<string, string>` | Nadpisanie hostów API, klucze: `apiPayments`, `panel`, `gateway` |
 | `onRequest` | `(context) => void` | Wywoływane przed każdym żądaniem - `checksum` i dane karty są już ukryte |
 | `onResponse` | `(context) => void` | Wywoływane po każdej odpowiedzi, która dotarła do SDK |
 

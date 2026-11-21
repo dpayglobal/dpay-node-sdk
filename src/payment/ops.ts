@@ -4,6 +4,7 @@ import { API_PAYMENTS, PANEL } from '../internal/base-urls.js'
 import type { ChecksumCalculator } from '../internal/checksum.js'
 import { type Operation, decodeRecordOrFail } from '../internal/operation.js'
 import { isScalar, phpStrval } from '../internal/php.js'
+import { requiredTrimmed, signPanelBody } from '../internal/server-trim.js'
 import {
   type RegisteredPayment,
   type Transaction,
@@ -35,14 +36,14 @@ export function registerOperation(
     host: API_PAYMENTS,
     path: '/api/v1_0/payments/register',
     body,
-    parse: parseRegisterResponse,
+    parse: (response) => parseRegisterResponse(response, params.amount.currency),
   }
 }
 
-function parseRegisterResponse(response: ApiResponse): RegisteredPayment {
+function parseRegisterResponse(response: ApiResponse, currency: string): RegisteredPayment {
   const data = decodeRecordOrFail(response)
   if (data.error === true || data.status === false) throw PaymentRejectedError.fromApi(data)
-  return parseRegisteredPayment(data)
+  return parseRegisteredPayment(data, currency)
 }
 
 export function detailsOperation(
@@ -50,8 +51,11 @@ export function detailsOperation(
   checksum: ChecksumCalculator,
   transactionId: string,
 ): Operation<Transaction> {
-  const body: Record<string, unknown> = { service, transaction_id: transactionId }
-  body.checksum = checksum.orderedBody(body)
+  // Sent and signed trimmed, the way the API trims strings before it verifies the checksum
+  const body = signPanelBody(checksum, {
+    service: requiredTrimmed(service, 'service'),
+    transaction_id: requiredTrimmed(transactionId, 'transaction_id'),
+  })
   return {
     method: 'POST',
     host: PANEL,

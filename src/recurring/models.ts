@@ -46,6 +46,8 @@ export interface RecurringRetryResult {
   readonly transactionId: string
   readonly status: RecurringRetryStatus | (string & {}) | null
   readonly isPending: boolean
+  /** The retry succeeded at once (`success`). */
+  readonly isSuccess: boolean
   readonly isFailed: boolean
   /** Which retry this was (1-3). */
   readonly count: number | null
@@ -94,6 +96,7 @@ export function parseRecurringRetryResult(data: Record<string, unknown>): Recurr
     transactionId: scalarString(data, 'transactionId'),
     status,
     isPending: status === RecurringRetryStatus.PENDING,
+    isSuccess: status === RecurringRetryStatus.SUCCESS,
     isFailed: status === RecurringRetryStatus.FAILED,
     count: isPhpInt(retry.count) ? (retry.count as number) : null,
     errorCode: strictString(retry, 'error'),

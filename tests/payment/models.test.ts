@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Money } from '../../src/money.js'
 import { parseRegisteredPayment, parseTransaction } from '../../src/payment/models.js'
 
 describe('parseRegisteredPayment', () => {
@@ -109,5 +110,87 @@ describe('parseTransaction', () => {
     expect(Object.isFrozen(transaction.raw)).toBe(false)
     // payer field is deliberately left mutable
     expect(Object.isFrozen(transaction.payer)).toBe(false)
+  })
+})
+
+describe('parseRegisteredPayment Multibanco and paid transaction fallbacks', () => {
+  it('defaults the Multibanco currency to EUR and accepts integer fields', () => {
+    const multibanco = parseRegisteredPayment({
+      multibanco: { entity: 12345, reference: 123456789, amount: 'x' },
+    }).multibanco
+    expect(multibanco?.entity).toBe('12345')
+    expect(multibanco?.reference).toBe('123456789')
+    expect(multibanco?.currency).toBe('EUR')
+    expect(multibanco?.amount).toBeNull()
+    expect(multibanco?.expiresAt).toBeNull()
+    expect(parseRegisteredPayment({ multibanco: { currency: 'eur' } }).multibanco?.currency).toBe('EUR')
+    expect(
+      parseRegisteredPayment({ multibanco: { currency: 'USD', amount: 3 } }).multibanco?.amount?.currency,
+    ).toBe('USD')
+    expect(parseRegisteredPayment({ multibanco: 'nope' }).multibanco).toBeNull()
+  })
+
+  it('reads a captured paid transaction in PLN by default', () => {
+    const transaction = parseRegisteredPayment({
+      msg: 'Transaction paid',
+      additionalInfo: { transaction: { payment_id: 'P-1', status: 'captured', value: '1.00' } },
+    }).paidTransaction
+    expect(transaction?.isPaid).toBe(true)
+    expect(transaction?.value?.equals(Money.pln(100))).toBe(true)
+    expect(parseRegisteredPayment({ additionalInfo: { transaction: [] } }).paidTransaction).toBeNull()
+  })
+})
+
+describe('parseTransaction fees and URLs', () => {
+  const fixture = (transaction: Record<string, unknown>): Record<string, unknown> => ({
+    transaction: { id: 'x', value: '1.00', status: 'paid', ...transaction },
+  })
+
+  it('maps the commission and the URLs', () => {
+    const transaction = parseTransaction(
+      fixture({
+        rate: 2,
+        minimal_fee: 20,
+        permanent_fee: 0,
+        urls: {
+          success: 'https://shop.example/ok',
+          fail: 'https://shop.example/fail',
+          ipn: 'https://shop.example/ipn',
+        },
+      }),
+    )
+    expect(transaction.rate).toBe('2')
+    expect(transaction.minimalFee).toBe(20)
+    expect(transaction.permanentFee).toBe(0)
+    expect(transaction.urls).toEqual({
+      success: 'https://shop.example/ok',
+      fail: 'https://shop.example/fail',
+      ipn: 'https://shop.example/ipn',
+    })
+  })
+
+  it('reads fees from database strings and a missing IPN', () => {
+    const transaction = parseTransaction(
+      fixture({
+        rate: '1.49',
+        minimal_fee: '30',
+        urls: { success: 'https://shop.example/ok', fail: '', ipn: null },
+      }),
+    )
+    expect(transaction.rate).toBe('1.49')
+    expect(transaction.minimalFee).toBe(30)
+    expect(transaction.permanentFee).toBeNull()
+    expect(transaction.urls?.fail).toBeNull()
+    expect(transaction.urls?.ipn).toBeNull()
+  })
+
+  it('leaves missing or unparsable fees and URLs null', () => {
+    const transaction = parseTransaction(fixture({ minimal_fee: 20.5, permanent_fee: '1.5', rate: true }))
+    expect(transaction.rate).toBeNull()
+    expect(transaction.minimalFee).toBeNull()
+    expect(transaction.permanentFee).toBeNull()
+    expect(transaction.urls).toBeNull()
+    expect(parseTransaction(fixture({ rate: 1.5, minimal_fee: '-5' })).rate).toBe('1.5')
+    expect(parseTransaction(fixture({ minimal_fee: '-5' })).minimalFee).toBe(-5)
   })
 })

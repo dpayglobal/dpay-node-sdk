@@ -116,3 +116,43 @@ describe('CardPaymentError.fromApi', () => {
     expect(CardPaymentError.fromApi({ success: false }).message).toBe('Card payment failed')
   })
 })
+
+describe('transaction context of API errors (0.3.0)', () => {
+  it('defaults the transaction id and the card error to null', () => {
+    const error = new ApiError('nope', 400)
+    expect(error.transactionId).toBeNull()
+    expect(error.cardError).toBeNull()
+    expect(new RateLimitError('slow down', 429).reset).toBeNull()
+  })
+
+  it('takes them as the last constructor arguments', () => {
+    const cardError = { code: 'payment_declined', declineCode: '51', declineMessage: null }
+    const error = new ApiError('nope', 400, null, {}, '', null, 'T-1', cardError)
+    expect(error.transactionId).toBe('T-1')
+    expect(error.cardError).toBe(cardError)
+    expect(new RateLimitError('slow down', 429, 12, 60, 0, '', 1790503560).reset).toBe(1790503560)
+  })
+
+  it('keeps PaymentRejectedError.transactionId on the base class', () => {
+    const error = PaymentRejectedError.fromApi({ msg: 'Rejected', transactionId: 'tx-1' })
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.transactionId).toBe('tx-1')
+    expect(error.cardError).toBeNull()
+    expect(new PaymentRejectedError('x', 200, null, {}, '', 'tx-2', 'desc').transactionId).toBe('tx-2')
+  })
+
+  it('reads the card error of a declined card operation', () => {
+    const error = CardPaymentError.fromApi({
+      success: false,
+      message: 'Payment declined',
+      error: { code: 'payment_declined', declineCode: '05', declineMessage: 'Do not honor' },
+    })
+    expect(error.cardError).toEqual({
+      code: 'payment_declined',
+      declineCode: '05',
+      declineMessage: 'Do not honor',
+    })
+    expect(Object.isFrozen(error.cardError)).toBe(true)
+    expect(CardPaymentError.fromApi({ success: false, error: 'x' }).cardError).toBeNull()
+  })
+})

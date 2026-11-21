@@ -1,3 +1,4 @@
+import { parseCardError } from '../card/card-error.js'
 import {
   AccessDeniedError,
   ApiError,
@@ -29,6 +30,10 @@ export function mapError(response: ApiResponse): ApiError {
   else if (typeof data.errorcode === 'string') errorCode = data.errorcode
   const reason = typeof data.reason === 'string' ? data.reason : null
   const fieldErrors = normalizeFieldErrors(data.errors)
+  // Payments API: the transaction created before the error and the card decline (declined saved-card charge)
+  const transactionId =
+    typeof data.transactionId === 'string' && data.transactionId !== '' ? data.transactionId : null
+  const cardError = isRecord(data.cardError) ? parseCardError(data.cardError) : null
 
   if (status === 429) {
     return new RateLimitError(
@@ -38,16 +43,20 @@ export function mapError(response: ApiResponse): ApiError {
       intHeader(response, 'X-RateLimit-Limit'),
       intHeader(response, 'X-RateLimit-Remaining'),
       rawBody,
+      intHeader(response, 'X-RateLimit-Reset'),
     )
   }
-  if (status === 401) return new AuthenticationError(message, status, errorCode, fieldErrors, rawBody, reason)
-  if (status === 403) return new AccessDeniedError(message, status, errorCode, fieldErrors, rawBody, reason)
-  if (status === 404) return new NotFoundError(message, status, errorCode, fieldErrors, rawBody, reason)
-  if (status === 400 || status === 422) {
-    return new InvalidRequestError(message, status, errorCode, fieldErrors, rawBody, reason)
-  }
-  if (status >= 500) return new ApiServerError(message, status, errorCode, fieldErrors, rawBody, reason)
-  return new ApiError(message, status, errorCode, fieldErrors, rawBody, reason)
+  const args = [message, status, errorCode, fieldErrors, rawBody, reason, transactionId, cardError] as const
+  if (status === 401) return new AuthenticationError(...args)
+  if (status === 403) return new AccessDeniedError(...args)
+  if (status === 404) return new NotFoundError(...args)
+  if (status === 400 || status === 422) return new InvalidRequestError(...args)
+  if (status >= 500) return new ApiServerError(...args)
+  return new ApiError(...args)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function normalizeFieldErrors(errors: unknown): Record<string, string[]> {

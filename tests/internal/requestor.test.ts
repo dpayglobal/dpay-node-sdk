@@ -25,6 +25,29 @@ const ping: Operation<Record<string, unknown>> = {
 }
 
 describe('ApiRequestor', () => {
+  it('sends extra headers after the SDK headers', async () => {
+    const transport = new MockHttpClient()
+    transport.queueJson(200, { status: 'success' })
+    await echo(transport).execute({ ...ping, headers: { 'DigitalPayments-PSP-Message-ID': 'RET-1' } })
+
+    const headers = transport.lastRequest.headers
+    expect(headers['DigitalPayments-PSP-Message-ID']).toBe('RET-1')
+    expect(Object.keys(headers)).toEqual([
+      'Accept',
+      'User-Agent',
+      'DigitalPayments-PSP-Message-ID',
+      'Content-Type',
+    ])
+  })
+
+  it('rejects header injection before sending', async () => {
+    const transport = new MockHttpClient()
+    for (const headers of [{ 'X-Test': 'a\r\nX-Other: b' }, { 'X Test': 'a' }, { 'X-Test:': 'a' }]) {
+      await expect(echo(transport).execute({ ...ping, headers })).rejects.toThrow(DPayValueError)
+    }
+    expect(transport.requests).toHaveLength(0)
+  })
+
   it('builds the URL, headers and body', async () => {
     const transport = new MockHttpClient()
     transport.queueJson(200, { ok: true })

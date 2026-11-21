@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BankService } from '../../src/bank/service.js'
 import { Config } from '../../src/config.js'
+import { DPayValueError } from '../../src/errors.js'
 import { ApiRequestor } from '../../src/internal/requestor.js'
 import { MockHttpClient } from '../../src/testing.js'
 
@@ -67,5 +68,31 @@ describe('BankService.forService', () => {
     const timestamp = transport.lastRequestBody.timestamp as number
     expect(timestamp).toBeGreaterThanOrEqual(before)
     expect(Number.isInteger(timestamp)).toBe(true)
+  })
+
+  it('sends and signs the service trimmed like the API', async () => {
+    const transport = new MockHttpClient()
+    const config = Config.fromOptions({
+      service: ' MyShop\ufeff',
+      secretHash: 'secret123',
+      httpClient: transport,
+    })
+    transport.queueJson(200, [])
+    await new BankService(new ApiRequestor(config, transport)).forService({ timestamp: 1753100000 })
+    expect(transport.lastRequestBody).toEqual({
+      service: 'MyShop',
+      timestamp: 1753100000,
+      checksum: '189d0301f163fb105c9f3d607e8fe0adbbfc5ecd8e16271a682d672f43ab623c',
+    })
+  })
+
+  it('rejects a service that is blank after trimming; the config itself is accepted', async () => {
+    const transport = new MockHttpClient()
+    const config = Config.fromOptions({ service: '\u3000', secretHash: 'secret123', httpClient: transport })
+    const banks = new BankService(new ApiRequestor(config, transport))
+    await expect(banks.forService({ timestamp: 1753100000 })).rejects.toThrow(
+      new DPayValueError('service must not be empty'),
+    )
+    expect(transport.requests).toHaveLength(0)
   })
 })

@@ -20,7 +20,10 @@ export class PaymentService {
     return this.api.execute(registerOperation(this.api.service, this.api.checksum, params), options)
   }
 
-  /** Reads the current state of a transaction, including its refunds. */
+  /**
+   * Reads the current state of a transaction, including its refunds. The transaction ID is sent trimmed, as the API
+   * trims it before it verifies the checksum; a blank one throws `DPayValueError`.
+   */
   async details(transactionId: string, options?: RequestOptions): Promise<Transaction> {
     return this.api.execute(detailsOperation(this.api.service, this.api.checksum, transactionId), options)
   }

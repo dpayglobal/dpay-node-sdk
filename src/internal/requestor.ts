@@ -1,15 +1,17 @@
 import { validateTimeoutMs } from '../config.js'
 import type { Config, RequestOptions } from '../config.js'
-import { DPayError, TransportError } from '../errors.js'
+import { DPayError, DPayValueError, TransportError } from '../errors.js'
 import type { ApiRequest, ApiResponse, HttpClient } from '../http/types.js'
 import { SDK_VERSION } from '../version.js'
 import { ChecksumCalculator } from './checksum.js'
 import { mapError } from './error-mapper.js'
 import type { Operation } from './operation.js'
 import { phpJsonEncode } from './php.js'
+import { hasControlCharacters } from './validation.js'
 
 const USER_AGENT = `dpay-node-sdk/${SDK_VERSION} node/${process.versions.node}`
 const REDACTED_KEYS = ['checksum', 'encryptedCardData', 'xPayToken']
+const HEADER_NAME = /^[A-Za-z0-9-]+$/
 
 export class ApiRequestor {
   readonly service: string
@@ -47,6 +49,13 @@ export class ApiRequestor {
   private buildRequest<T>(operation: Operation<T>, options?: RequestOptions): ApiRequest {
     const url = this.config.baseUrls.resolve(operation.host) + operation.path
     const headers: Record<string, string> = { Accept: 'application/json', 'User-Agent': USER_AGENT }
+    for (const [name, value] of Object.entries(operation.headers ?? {})) {
+      // Names and values must not be able to inject further headers
+      if (!HEADER_NAME.test(name) || typeof value !== 'string' || hasControlCharacters(value)) {
+        throw new DPayValueError(`Invalid request header "${name}"`)
+      }
+      headers[name] = value
+    }
     let body: string | null = null
     if (operation.body !== undefined) {
       headers['Content-Type'] = 'application/json'
